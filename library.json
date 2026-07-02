@@ -1,0 +1,234 @@
+[
+  {
+    "title": "Drunk in Love",
+    "artist": "Beyonc\u00e9",
+    "bpm": 73,
+    "key": "4A",
+    "genre": "R&B",
+    "energy": 6
+  },
+  {
+    "title": "Crazy in Love",
+    "artist": "Beyonc\u00e9",
+    "bpm": 99,
+    "key": "8B",
+    "genre": "R&B",
+    "energy": 9
+  },
+  {
+    "title": "Heartbreak Anniversary",
+    "artist": "Giveon",
+    "bpm": 76,
+    "key": "2A",
+    "genre": "R&B",
+    "energy": 3
+  },
+  {
+    "title": "Best Part",
+    "artist": "Daniel Caesar ft. H.E.R.",
+    "bpm": 82,
+    "key": "12A",
+    "genre": "R&B",
+    "energy": 3
+  },
+  {
+    "title": "Thinkin Bout You",
+    "artist": "Frank Ocean",
+    "bpm": 93,
+    "key": "4B",
+    "genre": "R&B",
+    "energy": 4
+  },
+  {
+    "title": "Kill Bill",
+    "artist": "SZA",
+    "bpm": 89,
+    "key": "8A",
+    "genre": "R&B",
+    "energy": 5
+  },
+  {
+    "title": "Good Days",
+    "artist": "SZA",
+    "bpm": 88,
+    "key": "9A",
+    "genre": "R&B",
+    "energy": 4
+  },
+  {
+    "title": "None of Your Concern",
+    "artist": "Jhen\u00e9 Aiko ft. Big Sean",
+    "bpm": 80,
+    "key": "2A",
+    "genre": "R&B",
+    "energy": 3
+  },
+  {
+    "title": "Over It",
+    "artist": "Summer Walker",
+    "bpm": 78,
+    "key": "4A",
+    "genre": "R&B",
+    "energy": 4
+  },
+  {
+    "title": "Focus",
+    "artist": "H.E.R.",
+    "bpm": 90,
+    "key": "6B",
+    "genre": "R&B",
+    "energy": 5
+  },
+  {
+    "title": "No Scrubs",
+    "artist": "TLC",
+    "bpm": 94,
+    "key": "4A",
+    "genre": "R&B",
+    "energy": 6
+  },
+  {
+    "title": "Waterfalls",
+    "artist": "TLC",
+    "bpm": 97,
+    "key": "8A",
+    "genre": "R&B",
+    "energy": 5
+  },
+  {
+    "title": "Slow Motion",
+    "artist": "Trey Songz",
+    "bpm": 70,
+    "key": "6A",
+    "genre": "R&B",
+    "energy": 5
+  },
+  {
+    "title": "God's Plan",
+    "artist": "Drake",
+    "bpm": 77,
+    "key": "4B",
+    "genre": "Hip-Hop",
+    "energy": 6
+  },
+  {
+    "title": "Rich Flex",
+    "artist": "Drake & 21 Savage",
+    "bpm": 95,
+    "key": "4A",
+    "genre": "Hip-Hop",
+    "energy": 8
+  },
+  {
+    "title": "HUMBLE.",
+    "artist": "Kendrick Lamar",
+    "bpm": 74,
+    "key": "8B",
+    "genre": "Hip-Hop",
+    "energy": 9
+  },
+  {
+    "title": "Not Like Us",
+    "artist": "Kendrick Lamar",
+    "bpm": 101,
+    "key": "11B",
+    "genre": "Hip-Hop",
+    "energy": 10
+  },
+  {
+    "title": "Goosebumps",
+    "artist": "Travis Scott",
+    "bpm": 130,
+    "key": "7B",
+    "genre": "Hip-Hop",
+    "energy": 8
+  },
+  {
+    "title": "Antidote",
+    "artist": "Travis Scott",
+    "bpm": 130,
+    "key": "8A",
+    "genre": "Hip-Hop",
+    "energy": 8
+  },
+  {
+    "title": "Lucid Dreams",
+    "artist": "Juice WRLD",
+    "bpm": 84,
+    "key": "4A",
+    "genre": "Hip-Hop",
+    "energy": 6
+  },
+  {
+    "title": "XO TOUR Llif3",
+    "artist": "Lil Uzi Vert",
+    "bpm": 76,
+    "key": "4A",
+    "genre": "Hip-Hop",
+    "energy": 7
+  },
+  {
+    "title": "Life Is Good",
+    "artist": "Future ft. Drake",
+    "bpm": 87,
+    "key": "8B",
+    "genre": "Hip-Hop",
+    "energy": 7
+  },
+  {
+    "title": "Mask Off",
+    "artist": "Future",
+    "bpm": 150,
+    "key": "11A",
+    "genre": "Hip-Hop",
+    "energy": 8
+  },
+  {
+    "title": "Congratulations",
+    "artist": "Post Malone ft. Quavo",
+    "bpm": 125,
+    "key": "10B",
+    "genre": "Hip-Hop",
+    "energy": 6
+  },
+  {
+    "title": "Rockstar",
+    "artist": "DaBaby ft. Roddy Ricch",
+    "bpm": 79,
+    "key": "6A",
+    "genre": "Hip-Hop",
+    "energy": 8
+  },
+  {
+    "title": "Timeless",
+    "artist": "The Weeknd",
+    "bpm": 107,
+    "key": "4A",
+    "genre": "R&B",
+    "energy": 6
+  },
+  {
+    "title": "Saturn",
+    "artist": "SZA",
+    "bpm": 100,
+    "key": "9B",
+    "genre": "R&B",
+    "energy": 4
+  },
+  {
+    "title": "Janice STFU",
+    "artist": "Drake",
+    "bpm": 142,
+    "key": "8A",
+    "genre": "Hip-Hop",
+    "energy": 7
+  },
+  {
+    "title": "TSU",
+    "artist": "Drake",
+    "bpm": 130,
+    "key": "8A",
+    "genre": "Hip-Hop",
+    "energy": 7
+  }
+]

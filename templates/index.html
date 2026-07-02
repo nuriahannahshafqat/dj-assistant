@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DJ Assistant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d0d0d;
+      color: #f0f0f0;
+      min-height: 100vh;
+      padding: 40px 24px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    header p {
+      margin-top: 8px;
+      color: #888;
+      font-size: 0.97rem;
+    }
+
+    /* ── Three-column page grid ── */
+    .page-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr 340px;
+      gap: 64px;
+      max-width: 1500px;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    /* ── Shared card ── */
+    .panel {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 32px;
+    }
+
+    .panel-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 24px;
+    }
+
+    /* ── Add to Library form ── */
+    .add-form .form-group { margin-bottom: 20px; }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 7px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: #7c3aed; }
+    input[type="text"]::placeholder { color: #555; }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.2s;
+      color: #fff;
+    }
+
+    .btn-primary { background: #7c3aed; }
+    .btn-primary:hover { background: #6d28d9; }
+    .btn-primary:active { background: #5b21b6; }
+
+    .btn-add { background: #065f46; margin-top: 4px; }
+    .btn-add:hover { background: #047857; }
+    .btn-add:active { background: #064e3b; }
+
+    /* ── Toasts ── */
+    .toast {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 9px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .toast-success {
+      background: #052e16;
+      border: 1px solid #166534;
+      color: #86efac;
+    }
+
+    .toast-error {
+      background: #2a1111;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .toast-warning {
+      background: #1c1505;
+      border: 1px solid #92400e;
+      color: #fcd34d;
+    }
+
+    /* ── Suggestions ── */
+    .suggestions {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .suggestions-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .suggestion-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 11px 14px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 9px;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .suggestion-btn:hover {
+      border-color: #7c3aed;
+      background: #1a1030;
+    }
+
+    .sug-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .sug-artist {
+      font-size: 0.82rem;
+      color: #888;
+    }
+
+    /* ── Search section ── */
+    .search-section { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Loading ── */
+    .loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 3px solid #2a2a2a;
+      border-top-color: #7c3aed;
+      border-right-color: #a78bfa;
+      animation: spin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text { font-size: 0.85rem; color: #888; }
+
+    .progress-bar-track {
+      width: 180px;
+      height: 3px;
+      background: #2a2a2a;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #7c3aed, #a78bfa);
+      border-radius: 99px;
+      animation: progress 6s ease-in-out forwards;
+    }
+
+    @keyframes progress {
+      0%   { width: 0%; }
+      40%  { width: 60%; }
+      70%  { width: 78%; }
+      90%  { width: 88%; }
+      100% { width: 92%; }
+    }
+
+    /* ── Rec header ── */
+    .rec-header {
+      background: linear-gradient(135deg, #2e1065 0%, #1a0a3d 100%);
+      border: 1px solid #4c1d95;
+      border-radius: 16px;
+      padding: 26px 28px;
+      text-align: center;
+    }
+
+    .rec-header .label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a78bfa;
+      margin-bottom: 10px;
+    }
+
+    .rec-header h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .rec-header .rec-artist {
+      margin-top: 5px;
+      font-size: 1rem;
+      color: #c4b5fd;
+    }
+
+    /* ── Detail boxes ── */
+    .detail-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .detail-box {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 13px;
+      padding: 18px 20px;
+    }
+
+    .box-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+
+    .detail-box.bpm .box-label { color: #34d399; }
+    .detail-box.energy .box-label { color: #fb923c; }
+
+    .detail-box p, .summary-box p {
+      font-size: 0.92rem;
+      color: #ccc;
+      line-height: 1.65;
+    }
+
+    .summary-box {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 13px;
+      padding: 20px 24px;
+    }
+
+    .summary-box .box-label { color: #a78bfa; }
+
+    /* ── Chain ── */
+    .chain-section { display: flex; flex-direction: column; gap: 10px; }
+
+    .chain-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #888;
+      padding-left: 2px;
+    }
+
+    .chain-track {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 13px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .chain-number {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #2a2a2a;
+      color: #888;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .chain-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
+    .chain-artist { font-size: 0.82rem; color: #888; margin-top: 2px; }
+    .chain-reason { font-size: 0.8rem; color: #666; margin-top: 5px; line-height: 1.4; }
+
+    .chain-meta { text-align: right; flex-shrink: 0; }
+    .chain-bpm { font-size: 0.83rem; font-weight: 600; color: #34d399; }
+    .chain-key { font-size: 0.78rem; color: #888; margin-top: 2px; }
+
+    /* ── Alternatives sidebar ── */
+    .alt-section { display: flex; flex-direction: column; gap: 16px; }
+
+    .alt-box {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 13px;
+      padding: 22px 24px;
+    }
+
+    .alt-title { font-size: 1.05rem; font-weight: 600; color: #fff; }
+    .alt-artist { font-size: 0.9rem; color: #888; margin-top: 4px; }
+
+    .alt-reason {
+      font-size: 0.88rem;
+      color: #666;
+      margin-top: 14px;
+      border-top: 1px solid #222;
+      padding-top: 14px;
+      line-height: 1.55;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .page-grid {
+        grid-template-columns: 1fr;
+      }
+      .detail-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>DJ Assistant</h1>
+    <p>Get your next track recommendation based on BPM, key &amp; energy</p>
+  </header>
+
+  <div class="page-grid">
+
+    <!-- ── Left: Add to Library ── -->
+    <div>
+      <div class="panel add-form">
+        <div class="panel-title">Add to Library</div>
+        <form action="/add" method="POST" onsubmit="startAddLoading()">
+          <div class="form-group">
+            <label for="add-track">Track</label>
+            <input type="text" id="add-track" name="track" placeholder="e.g. Essence" />
+          </div>
+          <div class="form-group">
+            <label for="add-artist">Artist</label>
+            <input type="text" id="add-artist" name="artist" placeholder="e.g. Wizkid" />
+          </div>
+          <button type="submit" class="btn btn-add" id="add-btn">Add Song</button>
+
+          <div class="loading" id="add-loading">
+            <div class="spinner" style="width:32px;height:32px;border-width:2px;border-top-color:#34d399;border-right-color:#6ee7b7;"></div>
+            <span class="loading-text" id="add-loading-text">Looking up on MusicBrainz...</span>
+          </div>
+        </form>
+
+        {% if add_success %}
+        <div class="toast toast-success">✓ {{ add_success }}</div>
+        {% endif %}
+        {% if add_warning %}
+        <div class="toast toast-warning">◆ {{ add_warning }}</div>
+        {% endif %}
+        {% if add_error %}
+        <div class="toast toast-error">⚠ {{ add_error }}</div>
+        {% endif %}
+
+        {% if add_suggestions %}
+        <div class="suggestions" style="margin-top:16px">
+          <div class="suggestions-label">Did you mean?</div>
+          {% for s in add_suggestions %}
+          <button type="button" class="suggestion-btn" data-action="add" data-title="{{ s.title | e }}" data-artist="{{ s.artist | e }}">
+            <span class="sug-title">{{ s.title }}</span>
+            <span class="sug-artist">{{ s.artist }}</span>
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Center: Search + Results ── -->
+    <div class="search-section">
+
+      <div class="panel">
+        <div class="panel-title">Find Next Track</div>
+        <form method="POST" onsubmit="startLoading()">
+          <div class="form-group">
+            <label for="track">Track</label>
+            <input type="text" id="track" name="track" placeholder="e.g. Kill Bill" value="{{ track }}" required autofocus />
+          </div>
+          <div class="form-group" style="margin-bottom:4px">
+            <label for="artist">Artist</label>
+            <input type="text" id="artist" name="artist" placeholder="e.g. SZA" value="{{ artist }}" required />
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top:12px">Find Next Track</button>
+
+          <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <span class="loading-text" id="loading-text">Searching MusicBrainz...</span>
+          </div>
+        </form>
+
+        {% if search_error %}
+        <div class="toast toast-error" style="margin-top:16px">⚠ {{ search_error }}</div>
+        {% endif %}
+
+        {% if suggestions %}
+        <div class="suggestions">
+          <div class="suggestions-label">Did you mean?</div>
+          {% for s in suggestions %}
+          <button type="button" class="suggestion-btn" data-action="search" data-title="{{ s.title | e }}" data-artist="{{ s.artist | e }}">
+            <span class="sug-title">{{ s.title }}</span>
+            <span class="sug-artist">{{ s.artist }}</span>
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% if rec %}
+
+      <div class="rec-header">
+        <div class="label">Next Track</div>
+        <h2>{{ rec.recommended_track }}</h2>
+        <div class="rec-artist">{{ rec.recommended_artist }}</div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-box bpm">
+          <div class="box-label">BPM Compatibility</div>
+          <p>{{ rec.bpm_compatibility }}</p>
+        </div>
+        <div class="detail-box energy">
+          <div class="box-label">Energy &amp; Vibes</div>
+          <p>{{ rec.energy_vibes }}</p>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="box-label">Why This Works</div>
+        <p>{{ rec.summary }}</p>
+      </div>
+
+      {% if rec.chain %}
+      <div class="chain-section">
+        <div class="chain-label">Play Next After This</div>
+        {% for t in rec.chain %}
+        <div class="chain-track">
+          <div class="chain-number">{{ loop.index }}</div>
+          <div>
+            <div class="chain-title">{{ t.title }}</div>
+            <div class="chain-artist">{{ t.artist }}</div>
+            <div class="chain-reason">{{ t.reason }}</div>
+          </div>
+          <div class="chain-meta">
+            <div class="chain-bpm">{{ t.bpm }} BPM</div>
+            <div class="chain-key">{{ t.key }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% endif %}
+    </div>
+
+    <!-- ── Right: Alternatives ── -->
+    <div>
+      {% if rec and rec.alternatives %}
+      <div class="alt-section">
+        <div class="panel-title" style="padding-left:2px">Alternatives</div>
+        {% for alt in rec.alternatives %}
+        <div class="alt-box">
+          <div class="alt-title">{{ alt.title }}</div>
+          <div class="alt-artist">{{ alt.artist }}</div>
+          <div class="alt-reason">{{ alt.reason }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.suggestion-btn[data-action]');
+      if (!btn) return;
+      const title  = btn.dataset.title;
+      const artist = btn.dataset.artist;
+      if (btn.dataset.action === 'search') {
+        document.getElementById('track').value  = title;
+        document.getElementById('artist').value = artist;
+        startLoading();
+        document.getElementById('track').closest('form').submit();
+      } else if (btn.dataset.action === 'add') {
+        document.getElementById('add-track').value  = title;
+        document.getElementById('add-artist').value = artist;
+        startAddLoading();
+        document.getElementById('add-track').closest('form').submit();
+      }
+    });
+
+    function startAddLoading() {
+      document.getElementById('add-btn').disabled = true;
+      document.getElementById('add-btn').style.opacity = '0.5';
+      const loader = document.getElementById('add-loading');
+      const text   = document.getElementById('add-loading-text');
+      loader.style.display = 'flex';
+
+      const messages = [
+        'Looking up on MusicBrainz...',
+        'Asking Claude for BPM & key...',
+        'Almost done...',
+      ];
+      let i = 0;
+      setInterval(() => { i = (i + 1) % messages.length; text.textContent = messages[i]; }, 2000);
+    }
+
+    function startLoading() {
+      const loader = document.getElementById('loading');
+      const fill   = document.getElementById('progress-fill');
+      const text   = document.getElementById('loading-text');
+      loader.style.display = 'flex';
+
+      const messages = [
+        'Searching MusicBrainz...',
+        'Analysing your library...',
+        'Checking Camelot Wheel...',
+        'Asking Claude...',
+        'Building your set...',
+        'Almost there...',
+      ];
+      let i = 0;
+      setInterval(() => { i = (i + 1) % messages.length; text.textContent = messages[i]; }, 1800);
+
+      fill.style.animation = 'none';
+      fill.offsetHeight;
+      fill.style.animation = '';
+    }
+  </script>
+
+</body>
+</html>
