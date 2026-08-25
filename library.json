@@ -328,5 +328,82 @@
     "confidence": "low",
     "confidence_note": "I do not have reliable recalled data for this specific track's tempo and key, so these are estimates based on The Weeknd's general stylistic range and the song's feel.",
     "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/26/33/d2/2633d2b9-58f1-f9c0-7b43-b9d5ab1e5005/mzaf_15573204222455676396.plus.aac.p.m4a"
+  },
+  {
+    "title": "In My Feelings",
+    "artist": "Drake",
+    "bpm": 91,
+    "key": "8A",
+    "genre": "Hip-Hop/R&B",
+    "energy": 6,
+    "confidence": "low",
+    "confidence_note": "I do not have reliable recalled data for this specific track's exact BPM and key, so these values are estimated based on genre conventions and general knowledge of Drake's style.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/1e/f0/ab/1ef0ab07-f9b6-ae6a-aad3-a7d63374e97f/mzaf_10070588351983905539.plus.aac.p.m4a"
+  },
+  {
+    "title": "No Diggity",
+    "artist": "Blackstreet",
+    "bpm": 98,
+    "key": "4A",
+    "genre": "R&B",
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I recognize this as a mid-90s R&B track with a laid-back groove, but the specific BPM and key are estimated from genre conventions rather than recalled from documented data.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/96/d7/27/96d727a5-e22b-a526-cec5-5d185180c8a0/mzaf_8685114639537905202.plus.aac.p.m4a"
+  },
+  {
+    "title": "Yeah!",
+    "artist": "Usher",
+    "bpm": 100,
+    "key": "8A",
+    "genre": "R&B",
+    "energy": 8,
+    "confidence": "low",
+    "confidence_note": "I recognize this as a high-energy R&B/hip-hop track by Usher featuring Lil Jon and Ludacris, but I am estimating the specific BPM and Camelot key rather than recalling verified data.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/94/52/3c/94523c88-f5f9-16f4-dbd7-f284ca168048/mzaf_7184891920196479048.plus.aac.p.m4a"
+  },
+  {
+    "title": "In da Club",
+    "artist": "50 Cent",
+    "bpm": 89,
+    "key": "8A",
+    "genre": "Hip-Hop",
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "The ~89 BPM tempo for this track is widely cited and I have reasonable recall of it, but the Camelot key is an estimate I'm less certain about.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/15/89/7e/15897ea5-b0a0-4c1f-3f64-559533df42b1/mzaf_10604019280667552271.plus.aac.p.m4a"
+  },
+  {
+    "title": "Hot in Herre",
+    "artist": "Nelly",
+    "bpm": 84,
+    "key": "7A",
+    "genre": "Hip-Hop",
+    "energy": 8,
+    "confidence": "low",
+    "confidence_note": "I recognize this as a well-known Nelly track but am estimating BPM and key from genre conventions rather than recalling verified, documented values for this specific recording.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/e0/1f/f3/e01ff398-5b46-58d8-eced-e4bf715dca33/mzaf_552008469913377827.plus.aac.p.m4a"
+  },
+  {
+    "title": "Redbone",
+    "artist": "Childish Gambino",
+    "bpm": 88,
+    "key": "11A",
+    "genre": "R&B",
+    "energy": 5,
+    "confidence": "medium",
+    "confidence_note": "I have some recall that Redbone is a slow-funk/R&B track around 88 BPM in a minor key, but I'm not fully certain of the exact Camelot key and am estimating partially from genre conventions.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/02/a5/05/02a5050a-d4d2-9123-f171-93ed3d180a3a/mzaf_139919145843734647.plus.aac.p.m4a"
+  },
+  {
+    "title": "One Dance",
+    "artist": "Drake, Wizkid & Kyla",
+    "bpm": 98,
+    "key": "8A",
+    "genre": "R&B",
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I have some familiarity with this track's general feel and recall figures cited around 98 BPM, but I cannot fully verify the exact key from memory and may be blending recalled data with genre-based estimation.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/a8/bd/68/a8bd68a2-dcd2-9024-3859-3a9fd6d53576/mzaf_16864609147187531487.plus.aac.p.m4a"
   }
 ]
