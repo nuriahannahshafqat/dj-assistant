@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Library — DJ Assistant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d0d0d;
+      color: #f0f0f0;
+      min-height: 100vh;
+      padding: 0 24px 80px;
+    }
+
+    .wrap { max-width: 1100px; margin: 0 auto; }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #0d0d0d;
+      border-bottom: 1px solid #1f1f1f;
+      margin: 0 -24px 40px;
+      padding: 18px 24px;
+    }
+
+    .topnav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .nav-links { display: flex; gap: 6px; }
+
+    .nav-link {
+      color: #999;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .nav-link:hover { color: #fff; border-color: #333; }
+
+    .nav-link.active {
+      background: #2e1065;
+      color: #c4b5fd;
+      border-color: #4c1d95;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      margin-bottom: 24px;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus { border-color: #7c3aed; }
+    .search-input::placeholder { color: #555; }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 1.8rem; font-weight: 700; color: #fff; }
+
+    .subtitle { color: #888; font-size: 0.92rem; margin-bottom: 28px; }
+
+    .toast {
+      margin-bottom: 20px;
+      padding: 12px 14px;
+      border-radius: 9px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .toast-success { background: #052e16; border: 1px solid #166534; color: #86efac; }
+    .toast-error { background: #2a1111; border: 1px solid #7f1d1d; color: #fca5a5; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 13px;
+      padding: 18px 20px;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-title { font-size: 1rem; font-weight: 600; color: #fff; }
+    .card-artist { font-size: 0.85rem; color: #888; margin-top: 2px; }
+
+    .card-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    .confidence-badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .confidence-high { background: #052e16; border: 1px solid #166534; color: #86efac; }
+    .confidence-medium { background: #1c1505; border: 1px solid #92400e; color: #fcd34d; }
+    .confidence-low { background: #2a1111; border: 1px solid #7f1d1d; color: #fca5a5; }
+    .confidence-unknown { background: #161616; border: 1px solid #2a2a2a; color: #666; }
+
+    .remove-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      font-size: 0.72rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+
+    .remove-btn:hover { border-color: #7f1d1d; background: #2a1111; color: #fca5a5; }
+
+    .preview-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid #333;
+      color: #999;
+      font-size: 0.68rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+
+    .preview-btn:hover { border-color: #7c3aed; background: #1a1030; color: #c4b5fd; }
+    .preview-btn.playing { border-color: #7c3aed; background: #2e1065; color: #c4b5fd; }
+
+    .card-meta {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #999;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .card-note {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: #666;
+      line-height: 1.45;
+      border-top: 1px solid #222;
+      padding-top: 10px;
+    }
+
+    .empty { color: #666; font-size: 0.92rem; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand">DJ Assistant</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link {{ 'active' if active_page == 'home' else '' }}">Find Track</a>
+        <a href="/library" class="nav-link {{ 'active' if active_page == 'library' else '' }}">Library</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header>
+      <h1>Your Library</h1>
+    </header>
+    <div class="subtitle">{{ library | length }} track{{ "" if library | length == 1 else "s" }}</div>
+
+    {% if add_success %}
+    <div class="toast toast-success">✓ {{ add_success }}</div>
+    {% endif %}
+    {% if add_error %}
+    <div class="toast toast-error">⚠ {{ add_error }}</div>
+    {% endif %}
+
+    {% if library %}
+    <input type="text" id="lib-search" class="search-input" placeholder="Search by title or artist..." oninput="filterLibrary()">
+    <div id="lib-no-results" class="empty" style="display:none">No tracks match your search.</div>
+    <div class="grid" id="lib-grid">
+      {% for t in library %}
+      <div class="card" data-title="{{ t.title | lower | e }}" data-artist="{{ t.artist | lower | e }}">
+        <div class="card-top">
+          <div>
+            <div class="card-title">{{ t.title }}</div>
+            <div class="card-artist">{{ t.artist }}</div>
+          </div>
+          <div class="card-actions">
+            {% if t.preview_url %}
+            <button type="button" class="preview-btn" data-url="{{ t.preview_url | e }}" onclick="togglePreview(this)" title="Play preview">▶</button>
+            {% endif %}
+            {% if t.confidence %}
+            <span class="confidence-badge confidence-{{ t.confidence }}">{{ t.confidence }}</span>
+            {% else %}
+            <span class="confidence-badge confidence-unknown">unknown</span>
+            {% endif %}
+            <form action="/remove" method="POST" onsubmit="return confirm('Remove &quot;{{ t.title | e }}&quot; from your library?');">
+              <input type="hidden" name="title" value="{{ t.title | e }}">
+              <input type="hidden" name="artist" value="{{ t.artist | e }}">
+              <input type="hidden" name="next" value="library">
+              <button type="submit" class="remove-btn" title="Remove from library">✕</button>
+            </form>
+          </div>
+        </div>
+        <div class="card-meta">
+          <span>{{ t.bpm }} BPM</span>
+          <span>{{ t.key }}</span>
+          <span>Energy {{ t.energy }}</span>
+          <span>{{ t.genre }}</span>
+        </div>
+        {% if t.confidence_note %}
+        <div class="card-note">{{ t.confidence_note }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">No tracks yet — add some from the main page.</div>
+    {% endif %}
+  </div>
+
+  <script>
+    let previewAudio = null;
+    let previewBtn = null;
+
+    function stopPreview() {
+      if (previewAudio) { previewAudio.pause(); }
+      if (previewBtn) { previewBtn.textContent = '▶'; previewBtn.classList.remove('playing'); }
+      previewAudio = null;
+      previewBtn = null;
+    }
+
+    function togglePreview(btn) {
+      if (previewBtn === btn) { stopPreview(); return; }
+      stopPreview();
+      const audio = new Audio(btn.dataset.url);
+      audio.addEventListener('ended', stopPreview);
+      audio.play().catch(() => {});
+      previewAudio = audio;
+      previewBtn = btn;
+      btn.textContent = '⏸';
+      btn.classList.add('playing');
+    }
+
+    function filterLibrary() {
+      const input = document.getElementById('lib-search');
+      if (!input) return;
+      const q = input.value.trim().toLowerCase();
+      let anyVisible = false;
+      document.querySelectorAll('#lib-grid .card').forEach(function (card) {
+        const match = !q || card.dataset.title.includes(q) || card.dataset.artist.includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+      const noResults = document.getElementById('lib-no-results');
+      if (noResults) noResults.style.display = (q && !anyVisible) ? 'block' : 'none';
+    }
+  </script>
+</body>
+</html>

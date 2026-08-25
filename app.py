@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import re
+import secrets
+from datetime import timedelta
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -17,12 +19,15 @@ _secret = os.getenv("SECRET_KEY")
 if not _secret:
     raise RuntimeError("SECRET_KEY environment variable must be set before running the app.")
 app.secret_key = _secret
+app.permanent_session_lifetime = timedelta(days=365)
 
 logging.basicConfig(level=logging.ERROR)
 
 MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2"
 MB_HEADERS = {"User-Agent": "dj-assistant/1.0 (nuriashafqat711@gmail.com)"}
-LIBRARY_PATH = "library.json"
+ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
+SEED_LIBRARY_PATH = "library.json"
+VISITOR_LIBRARIES_PATH = "visitor_libraries.json"
 MB_TIMEOUT = 10
 
 _retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
@@ -31,20 +36,28 @@ _session.mount("https://", HTTPAdapter(max_retries=_retry))
 
 
 def _mb_artist_name(recording: dict) -> str:
+    """Builds the joint artist credit, preferring each artist's canonical
+    registered name over the (sometimes inconsistently cased) per-recording
+    credited-as name, and normalizing ft/feat join phrases to include a period.
+    """
     credits = recording.get("artist-credit", [])
     parts = []
     for c in credits:
         if isinstance(c, dict):
-            parts.append(c.get("name") or c.get("artist", {}).get("name", ""))
+            parts.append(c.get("artist", {}).get("name") or c.get("name", ""))
+            parts.append(c.get("joinphrase", ""))
         elif isinstance(c, str):
             parts.append(c)
-    return "".join(parts).strip()
+    name = "".join(parts).strip()
+    name = re.sub(r"\bft\b(?!\.)", "ft.", name)
+    name = re.sub(r"\bfeat\b(?!\.)", "feat.", name)
+    return name
 
 
-def _mb_fetch_details(rec_id: str, track: str) -> dict:
+def _mb_fetch_details(rec_id: str, track: str, artist: str) -> dict:
     detail = _session.get(
         f"{MUSICBRAINZ_BASE}/recording/{rec_id}",
-        params={"inc": "tags+genres", "fmt": "json"},
+        params={"inc": "tags+genres+artist-credits", "fmt": "json"},
         headers=MB_HEADERS,
         timeout=MB_TIMEOUT,
     )
@@ -52,6 +65,7 @@ def _mb_fetch_details(rec_id: str, track: str) -> dict:
     data = detail.json()
     return {
         "title": data.get("title", track),
+        "artist": _mb_artist_name(data) or artist,
         "mbid": rec_id,
         "tags": [t["name"] for t in data.get("tags", [])],
         "genres": [g["name"] for g in data.get("genres", [])],
@@ -77,7 +91,7 @@ def search_musicbrainz(track: str, artist: str) -> tuple:
     """
     strict = _mb_search(f'recording:"{track}" AND artist:"{artist}"')
     if strict and strict[0].get("score", 0) >= 85:
-        return _mb_fetch_details(strict[0]["id"], track), []
+        return _mb_fetch_details(strict[0]["id"], track, artist), []
 
     # Strict query failed or low confidence — try fuzzy (no quotes)
     fuzzy = _mb_search(f"recording:{track} artist:{artist}")
@@ -98,14 +112,84 @@ def search_musicbrainz(track: str, artist: str) -> tuple:
     return {}, suggestions
 
 
-def load_library() -> list:
-    with open(LIBRARY_PATH) as f:
+_FEAT_PATTERN = re.compile(r"\s*[\(\[](feat\.|with)[^\)\]]*[\)\]]", re.IGNORECASE)
+_ALT_VERSION_KEYWORDS = (
+    "remix", "instrumental", "mix)", "megamix", "sped up", "slowed",
+    "live", "acoustic", "karaoke", "cover", "mixed", "extended", "version)",
+)
+
+
+def _normalize_title(s: str) -> str:
+    s = _FEAT_PATTERN.sub("", s)
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _is_alt_version(track_name: str) -> bool:
+    lowered = track_name.lower()
+    return any(kw in lowered for kw in _ALT_VERSION_KEYWORDS)
+
+
+def get_preview_url(track: str, artist: str) -> str | None:
+    try:
+        resp = _session.get(
+            ITUNES_SEARCH_URL,
+            params={"term": f"{track} {artist}", "entity": "song", "limit": 10},
+            timeout=MB_TIMEOUT,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        if not results:
+            return None
+
+        candidates = [r for r in results if not _is_alt_version(r.get("trackName", ""))] or results
+
+        target_title = _normalize_title(track)
+        target_artist = artist.lower()
+        exact = [
+            r for r in candidates
+            if _normalize_title(r.get("trackName", "")) == target_title
+            and target_artist in r.get("artistName", "").lower()
+        ]
+
+        best = exact[0] if exact else candidates[0]
+        return best.get("previewUrl")
+    except Exception:
+        logging.exception("iTunes preview lookup failed")
+        return None
+
+
+def get_visitor_id() -> str:
+    if "visitor_id" not in session:
+        session["visitor_id"] = secrets.token_urlsafe(16)
+        session.permanent = True
+    return session["visitor_id"]
+
+
+def _load_all_visitor_libraries() -> dict:
+    if not os.path.exists(VISITOR_LIBRARIES_PATH):
+        return {}
+    with open(VISITOR_LIBRARIES_PATH) as f:
         return json.load(f)
 
 
-def save_library(library: list) -> None:
-    with open(LIBRARY_PATH, "w") as f:
-        json.dump(library, f, indent=2)
+def _save_all_visitor_libraries(data: dict) -> None:
+    with open(VISITOR_LIBRARIES_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_library(visitor_id: str) -> list:
+    data = _load_all_visitor_libraries()
+    if visitor_id not in data:
+        with open(SEED_LIBRARY_PATH) as f:
+            data[visitor_id] = json.load(f)
+        _save_all_visitor_libraries(data)
+    return data[visitor_id]
+
+
+def save_library(visitor_id: str, library: list) -> None:
+    data = _load_all_visitor_libraries()
+    data[visitor_id] = library
+    _save_all_visitor_libraries(data)
 
 
 def call_claude(prompt: str, max_tokens: int = 512) -> str:
@@ -146,9 +230,14 @@ def get_track_metadata(track: str, artist: str, mb_info: dict) -> dict:
     prompt = f"""What is the BPM, Camelot Wheel key, energy level, and genre of "{track}" by {artist}?
 MusicBrainz tags for reference: {_safe_tags(mb_info)}
 
+Before answering, decide honestly: do you actually recognize this specific recording and recall its real,
+documented tempo/key — or are you estimating from genre/artist conventions because you don't have specific
+knowledge of this exact track? Rate your confidence accordingly; don't default to "high" just because you
+produced a specific-sounding number.
+
 Respond ONLY with a JSON object, no other text:
-{{"bpm": <integer>, "key": "<Camelot key e.g. 8A or 5B>", "energy": <integer 1-10>, "genre": "<primary genre e.g. R&B, Hip-Hop, Pop>"}}"""
-    return parse_json_response(call_claude(prompt, max_tokens=256))
+{{"bpm": <integer>, "key": "<Camelot key e.g. 8A or 5B>", "energy": <integer 1-10>, "genre": "<primary genre e.g. R&B, Hip-Hop, Pop>", "confidence": "<high|medium|low>", "confidence_note": "<one short sentence: recalled fact or estimate, and why>"}}"""
+    return parse_json_response(call_claude(prompt, max_tokens=300))
 
 
 def recommend_next_track(track: str, artist: str, mb_info: dict, library: list) -> dict:
@@ -195,6 +284,7 @@ For chain: pick 3 tracks from the library that should follow the recommended tra
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    visitor_id = get_visitor_id()
     rec = None
     search_error = None
     suggestions = []
@@ -205,6 +295,7 @@ def index():
     add_error = request.args.get("add_error")
     add_warning = request.args.get("add_warning")
     add_suggestions = session.pop("add_suggestions", [])
+    library = list(reversed(load_library(visitor_id)))
 
     if request.method == "POST":
         track = request.form.get("track", "").strip()
@@ -220,8 +311,8 @@ def index():
                 if not mb_info:
                     search_error = f'We couldn\'t find "{track}" by {artist}. Please check the spelling or try one of the suggestions below.'
                 else:
-                    library = load_library()
-                    rec = recommend_next_track(track, artist, mb_info, library)
+                    mb_artist = mb_info.get("artist") or artist
+                    rec = recommend_next_track(track, mb_artist, mb_info, load_library(visitor_id))
             except Exception as e:
                 logging.exception("Search error")
                 search_error = "Something went wrong. Please try again."
@@ -237,11 +328,14 @@ def index():
         add_error=add_error,
         add_warning=add_warning,
         add_suggestions=add_suggestions,
+        library=library,
+        active_page="home",
     )
 
 
 @app.route("/add", methods=["POST"])
 def add_track():
+    visitor_id = get_visitor_id()
     track = request.form.get("track", "").strip()
     artist = request.form.get("artist", "").strip()
 
@@ -257,31 +351,80 @@ def add_track():
             session["add_suggestions"] = add_suggestions
             return redirect(url_for("index", add_error=f'Couldn\'t find "{track}" by {artist}. Did you mean one of these?'))
 
-        library = load_library()
+        mb_artist = mb_info.get("artist") or artist
+
+        library = load_library(visitor_id)
         mb_title = mb_info.get("title", track).lower()
         for t in library:
             stored_title = t["title"].lower()
             stored_artist = t["artist"].lower()
-            if stored_artist == artist.lower() and (stored_title == track.lower() or stored_title == mb_title):
+            if stored_artist == mb_artist.lower() and (stored_title == track.lower() or stored_title == mb_title):
                 return redirect(url_for("index", add_warning=f'"{t["title"]}" by {t["artist"]} is already in your library.'))
 
-        metadata = get_track_metadata(track, artist, mb_info)
+        metadata = get_track_metadata(track, mb_artist, mb_info)
+        confidence = metadata.get("confidence") or "low"
+        preview_url = get_preview_url(track, mb_artist)
 
         library.append({
             "title": mb_info.get("title", track),
-            "artist": artist,
-            "bpm": metadata.get("bpm", 0),
-            "key": metadata.get("key", "1A"),
-            "genre": metadata.get("genre", "Unknown"),
-            "energy": metadata.get("energy", 5),
+            "artist": mb_artist,
+            "bpm": metadata.get("bpm") or 0,
+            "key": metadata.get("key") or "1A",
+            "genre": metadata.get("genre") or "Unknown",
+            "energy": metadata.get("energy") or 5,
+            "confidence": confidence,
+            "confidence_note": metadata.get("confidence_note") or "",
+            "preview_url": preview_url,
         })
-        save_library(library)
+        save_library(visitor_id, library)
 
-        return redirect(url_for("index", add_success=f'"{mb_info.get("title", track)}" by {artist} added to your library!'))
+        add_success = f'"{mb_info.get("title", track)}" by {mb_artist} added to your library!'
+        if confidence in ("low", "medium"):
+            note = metadata.get("confidence_note", "")
+            suffix = f" — {note}" if note else ""
+            return redirect(url_for(
+                "index",
+                add_success=add_success,
+                add_warning=f"BPM/key/energy confidence for this track is {confidence}{suffix}. Worth double-checking manually.",
+            ))
+        return redirect(url_for("index", add_success=add_success))
 
     except Exception:
         logging.exception("Add track error")
         return redirect(url_for("index", add_error="Something went wrong adding that track. Please try again."))
+
+
+@app.route("/remove", methods=["POST"])
+def remove_track():
+    visitor_id = get_visitor_id()
+    title = request.form.get("title", "").strip()
+    artist = request.form.get("artist", "").strip()
+    next_page = request.form.get("next", "index")
+    target = "library_page" if next_page == "library" else "index"
+
+    library = load_library(visitor_id)
+    filtered = [t for t in library if not (t["title"] == title and t["artist"] == artist)]
+
+    if len(filtered) == len(library):
+        return redirect(url_for(target, add_error=f'Couldn\'t find "{title}" by {artist} to remove.'))
+
+    save_library(visitor_id, filtered)
+    return redirect(url_for(target, add_success=f'Removed "{title}" by {artist} from your library.'))
+
+
+@app.route("/library")
+def library_page():
+    visitor_id = get_visitor_id()
+    library = list(reversed(load_library(visitor_id)))
+    add_success = request.args.get("add_success")
+    add_error = request.args.get("add_error")
+    return render_template(
+        "library.html",
+        library=library,
+        add_success=add_success,
+        add_error=add_error,
+        active_page="library",
+    )
 
 
 if __name__ == "__main__":

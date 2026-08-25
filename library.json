@@ -5,7 +5,10 @@
     "bpm": 73,
     "key": "4A",
     "genre": "R&B",
-    "energy": 6
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Drunk in Love' is around 130 BPM (not 73, though 73 could reflect a half-time interpretation), Camelot 4A seems plausible but unverified, and while energy and genre feel reasonable, I cannot aurally verify the actual recording's analyzed values.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/1a/19/27/1a1927cf-35a8-573e-3897-2a6e7013cbc6/mzaf_15744090567851932481.plus.aac.p.m4a"
   },
   {
     "title": "Crazy in Love",
@@ -13,15 +16,21 @@
     "bpm": 99,
     "key": "8B",
     "genre": "R&B",
-    "energy": 9
+    "energy": 9,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Crazy in Love' is approximately 99 BPM and in a key consistent with 8B (B major), but I cannot aurally verify the exact BPM or key from memory with certainty, and the energy rating of 9/10 is a subjective platform-specific value I cannot confirm.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview126/v4/b5/2a/4f/b52a4fcd-0628-cb38-c8ab-a697c11a9175/mzaf_1541321636664021445.plus.aac.p.m4a"
   },
   {
     "title": "Heartbreak Anniversary",
-    "artist": "Giveon",
+    "artist": "GIV\u0112ON",
     "bpm": 76,
     "key": "2A",
     "genre": "R&B",
-    "energy": 3
+    "energy": 3,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Heartbreak Anniversary' is a slow, low-energy R&B track by Giveon, which makes these values plausible, but I cannot verify the precise BPM of 76 or the exact Camelot key '2A' without audio analysis tools, so I can't confirm accuracy with high confidence.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/94/60/33/94603392-2593-5774-0130-f874074fdd6e/mzaf_11055143639753501022.plus.aac.p.m4a"
   },
   {
     "title": "Best Part",
@@ -29,7 +38,10 @@
     "bpm": 82,
     "key": "12A",
     "genre": "R&B",
-    "energy": 3
+    "energy": 3,
+    "confidence": "medium",
+    "confidence_note": "I recognize the track and the values are plausible \u2014 'Best Part' is a slow, mellow R&B song so ~82 BPM, low energy, and 12A (Ab minor) are in the right ballpark \u2014 but I cannot verify the exact BPM or precise Camelot key from memory with enough certainty to call this high confidence.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/57/5a/30/575a30e2-83b2-0810-104d-681343521476/mzaf_10862779365075492896.plus.aac.p.m4a"
   },
   {
     "title": "Thinkin Bout You",
@@ -37,7 +49,10 @@
     "bpm": 93,
     "key": "4B",
     "genre": "R&B",
-    "energy": 4
+    "energy": 4,
+    "confidence": "medium",
+    "confidence_note": "I recognize the track well and the values are plausible (BPM ~93 and key of B major/4B are consistent with what's commonly reported), but I cannot verify these with certainty from memory as BPM and key metadata vary slightly across sources and analyses.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview126/v4/8a/2c/35/8a2c35f6-ac70-560c-0a1c-516e105c6af8/mzaf_13522699475931524613.plus.aac.p.m4a"
   },
   {
     "title": "Kill Bill",
@@ -45,7 +60,10 @@
     "bpm": 89,
     "key": "8A",
     "genre": "R&B",
-    "energy": 5
+    "energy": 5,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Kill Bill' by SZA is a mid-tempo R&B track roughly in that BPM range, but I cannot verify the exact BPM, Camelot key, or energy score with certainty as these require precise audio analysis tools I don't have access to.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/45/2b/ea/452bead6-c7f5-82d4-f5f7-ec876014b4cc/mzaf_2905911853279084717.plus.aac.p.m4a"
   },
   {
     "title": "Good Days",
@@ -53,7 +71,10 @@
     "bpm": 88,
     "key": "9A",
     "genre": "R&B",
-    "energy": 4
+    "energy": 4,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Good Days' by SZA is a slow, mellow R&B track which makes these values plausible, but I cannot verify the exact BPM or Camelot key from memory with enough precision to call this high confidence.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9b/32/fe/9b32fec3-fbfb-db0f-3dcf-bb089d412f23/mzaf_15200324731067771849.plus.aac.p.m4a"
   },
   {
     "title": "None of Your Concern",
@@ -61,7 +82,10 @@
     "bpm": 80,
     "key": "2A",
     "genre": "R&B",
-    "energy": 3
+    "energy": 3,
+    "confidence": "medium",
+    "confidence_note": "I recognize the track and the values are plausible (it's a slow, mellow R&B ballad around 80 BPM), but I cannot verify the exact BPM or Camelot key with certainty from memory alone, so these could be close estimates rather than confirmed values.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/d9/9f/99/d99f9926-e346-a208-026b-261ccc9ad35e/mzaf_6015257850017369899.plus.aac.p.m4a"
   },
   {
     "title": "Over It",
@@ -69,7 +93,10 @@
     "bpm": 78,
     "key": "4A",
     "genre": "R&B",
-    "energy": 4
+    "energy": 4,
+    "confidence": "low",
+    "confidence_note": "While I have general knowledge that 'Over It' by Summer Walker is a slow R&B track consistent with these rough values, I cannot actually analyze audio or verify precise BPM and Camelot key figures, so these could easily be off by meaningful margins.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/f8/13/ca/f813ca6e-48a5-0072-f6f3-a8b67ac4be33/mzaf_12085151599818252160.plus.aac.p.m4a"
   },
   {
     "title": "Focus",
@@ -77,7 +104,10 @@
     "bpm": 90,
     "key": "6B",
     "genre": "R&B",
-    "energy": 5
+    "energy": 5,
+    "confidence": "low",
+    "confidence_note": "While H.E.R.'s 'Focus' is a slow R&B track and these values seem plausible on the surface, I cannot reliably verify the specific BPM (90), Camelot key (6B), or energy score with confidence from memory alone, and these technical metadata values are easy to misremember or conflate across similar tracks.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/82/f5/2b/82f52b11-fa97-29eb-26fd-c01289cd854e/mzaf_8611129255464452437.plus.aac.p.m4a"
   },
   {
     "title": "No Scrubs",
@@ -85,7 +115,10 @@
     "bpm": 94,
     "key": "4A",
     "genre": "R&B",
-    "energy": 6
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I recognize 'No Scrubs' well enough to know ~94 BPM and 4A are plausible but I cannot verify the exact analyzed values without access to the actual audio, and BPM/key metadata varies slightly between analysis tools and versions.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/59/d7/cb/59d7cbad-8695-6bef-5784-05d678ad22ad/mzaf_10240892877744551995.plus.aac.p.m4a"
   },
   {
     "title": "Waterfalls",
@@ -93,7 +126,10 @@
     "bpm": 97,
     "key": "8A",
     "genre": "R&B",
-    "energy": 5
+    "energy": 5,
+    "confidence": "medium",
+    "confidence_note": "I recognize 'Waterfalls' by TLC and the values are plausible (BPM ~97 and 8A/Ab minor are credible for this track), but I cannot verify precise BPM or Camelot key from memory without access to audio analysis tools, so these could be slightly off from what a DAW or DJ software would calculate.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/e9/81/4e/e9814ecd-7282-e0cf-6a19-70ea78117382/mzaf_10928185948311762507.plus.aac.p.m4a"
   },
   {
     "title": "Slow Motion",
@@ -101,7 +137,10 @@
     "bpm": 70,
     "key": "6A",
     "genre": "R&B",
-    "energy": 5
+    "energy": 5,
+    "confidence": "medium",
+    "confidence_note": "I recognize 'Slow Motion' by Trey Songz as a slow R&B track where these values feel plausible, but I cannot verify the exact BPM, Camelot key, or energy score from memory with enough precision to call them definitively accurate rather than reasonable estimates.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/25/06/20/2506201c-ba2b-517a-6982-b00fe789e047/mzaf_14416966665273738938.plus.aac.p.m4a"
   },
   {
     "title": "God's Plan",
@@ -109,7 +148,10 @@
     "bpm": 77,
     "key": "4B",
     "genre": "Hip-Hop",
-    "energy": 6
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'God's Plan' is a slower, laid-back hip-hop track roughly in that BPM range, but I cannot verify the exact BPM, Camelot key, or energy score without actual audio analysis, so these values could be off by meaningful margins.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/da/7d/f1/da7df14b-8ee6-5020-d850-ccc0381eb141/mzaf_5511967710095380808.plus.aac.p.m4a"
   },
   {
     "title": "Rich Flex",
@@ -117,7 +159,10 @@
     "bpm": 95,
     "key": "4A",
     "genre": "Hip-Hop",
-    "energy": 8
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Rich Flex' is a slow-tempo hip-hop track and these values are plausible, but I cannot algorithmically verify BPM or Camelot key from audio, so I cannot confirm precision \u2014 for example, BPM estimates for this track vary in the 90\u201396 range depending on the tool used.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview112/v4/42/7a/3c/427a3c89-c75c-4b80-4a73-4842a7e79176/mzaf_1663953284265055546.plus.aac.p.m4a"
   },
   {
     "title": "HUMBLE.",
@@ -125,7 +170,10 @@
     "bpm": 74,
     "key": "8B",
     "genre": "Hip-Hop",
-    "energy": 9
+    "energy": 9,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'HUMBLE.' is around 150 BPM (or ~75 if half-time interpreted), and 8B (E major/C# minor) and high energy are plausible, but I cannot actually analyze audio to verify these specific values with certainty, and BPM interpretations can vary by tool depending on half-time/double-time detection.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/30/3f/27/303f27c8-1997-8c57-66b3-b67e7c720779/mzaf_5598476068977070849.plus.aac.p.m4a"
   },
   {
     "title": "Not Like Us",
@@ -133,7 +181,10 @@
     "bpm": 101,
     "key": "11B",
     "genre": "Hip-Hop",
-    "energy": 10
+    "energy": 10,
+    "confidence": "medium",
+    "confidence_note": "I recognize the track and genre assignment seems correct, but BPM and Camelot key are precise technical measurements I cannot reliably verify from training data alone, and energy scores vary by platform/methodology, so these specific values could easily be off.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b6/6b/8c/b66b8c42-8c82-242b-4ef1-3655d19ac1aa/mzaf_1950801191699299821.plus.aac.p.m4a"
   },
   {
     "title": "Goosebumps",
@@ -141,7 +192,10 @@
     "bpm": 130,
     "key": "7B",
     "genre": "Hip-Hop",
-    "energy": 8
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Goosebumps' is around 130 BPM and fits Hip-Hop, but I cannot aurally verify the exact BPM, Camelot key, or energy score, and these values vary slightly across different analyses and versions of the track.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/03/0a/ae/030aaeb0-a9fc-280e-c33c-e02d0b95264c/mzaf_13068295871760308152.plus.aac.p.m4a"
   },
   {
     "title": "Antidote",
@@ -149,7 +203,10 @@
     "bpm": 130,
     "key": "8A",
     "genre": "Hip-Hop",
-    "energy": 8
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Antidote' is around 130 BPM and fits a Hip-Hop classification, but I cannot audibly verify the exact BPM, Camelot key, or energy score, and these values vary slightly across different analysis tools.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/3c/23/57/3c235787-b5f4-661a-29e6-8fb91b6741f5/mzaf_4993348420404359060.plus.aac.p.m4a"
   },
   {
     "title": "Lucid Dreams",
@@ -157,7 +214,10 @@
     "bpm": 84,
     "key": "4A",
     "genre": "Hip-Hop",
-    "energy": 6
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I recognize 'Lucid Dreams' by Juice WRLD and the values are broadly plausible, but BPM and key can vary by analysis tool, and I cannot verify these specific figures with certainty from my training data.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/97/45/24/9745248c-c488-c47b-6f74-b9492d1fd807/mzaf_16311560952471221231.plus.aac.p.m4a"
   },
   {
     "title": "XO TOUR Llif3",
@@ -165,7 +225,10 @@
     "bpm": 76,
     "key": "4A",
     "genre": "Hip-Hop",
-    "energy": 7
+    "energy": 7,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'XO TOUR Llif3' is a well-known Lil Uzi Vert track with a relatively slow, melancholic feel consistent with ~76 BPM and a minor key, but I cannot verify the exact BPM, Camelot key, or energy score from memory with enough precision to call these confirmed rather than plausible estimates.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/ff/be/8d/ffbe8d52-9942-858b-75e7-ef68b27da9c1/mzaf_16399358930097655830.plus.aac.p.m4a"
   },
   {
     "title": "Life Is Good",
@@ -173,7 +236,10 @@
     "bpm": 87,
     "key": "8B",
     "genre": "Hip-Hop",
-    "energy": 7
+    "energy": 7,
+    "confidence": "medium",
+    "confidence_note": "I have general familiarity with this track and the values seem plausible, but I cannot actually analyze audio or verify BPM/key with precision, and different tools/sources often produce slightly varying results for these metadata fields.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/7c/73/3a/7c733a58-53fd-f1b0-0617-f58a2d61076b/mzaf_5311314272998378217.plus.aac.p.m4a"
   },
   {
     "title": "Mask Off",
@@ -181,7 +247,10 @@
     "bpm": 150,
     "key": "11A",
     "genre": "Hip-Hop",
-    "energy": 8
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "I know 'Mask Off' by Future and the values seem plausible, but I cannot actually analyze audio or verify exact BPM/key with certainty \u2014 150 BPM and 11A are within reasonable range but could be off depending on the specific version or analysis tool used.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/f4/25/2e/f4252ec4-c982-18bc-ca52-dadd4ea3d3ba/mzaf_15813796359675883581.plus.aac.p.m4a"
   },
   {
     "title": "Congratulations",
@@ -189,7 +258,10 @@
     "bpm": 125,
     "key": "10B",
     "genre": "Hip-Hop",
-    "energy": 6
+    "energy": 6,
+    "confidence": "medium",
+    "confidence_note": "I have general familiarity with this song and the values are plausible, but I cannot aurally verify the exact BPM or Camelot key from memory with enough precision to confidently confirm rather than just not contradict them.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/01/ac/2b/01ac2b38-2827-73cc-d723-56737e3e822d/mzaf_14438747186719391954.plus.aac.p.m4a"
   },
   {
     "title": "Rockstar",
@@ -197,7 +269,10 @@
     "bpm": 79,
     "key": "6A",
     "genre": "Hip-Hop",
-    "energy": 8
+    "energy": 8,
+    "confidence": "medium",
+    "confidence_note": "I have general knowledge that 'Rockstar' by DaBaby ft. Roddy Ricch is a slower hip-hop track around 79-80 BPM which aligns, but I cannot precisely verify the Camelot key or confirm the energy score without direct audio analysis, making these values plausible but not fully verifiable.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/95/55/30/9555307b-6009-136c-aa4e-c5fb157d8dae/mzaf_6166511402374037004.plus.aac.p.m4a"
   },
   {
     "title": "Timeless",
@@ -205,7 +280,10 @@
     "bpm": 107,
     "key": "4A",
     "genre": "R&B",
-    "energy": 6
+    "energy": 6,
+    "confidence": "low",
+    "confidence_note": "While The Weeknd has a song called 'Timeless,' I cannot reliably verify precise technical metadata like exact BPM or Camelot key from memory, and these values could easily be off or conflated with a different recording.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/db/af/b3/dbafb30f-149d-a1a5-d213-7ca5f4e38478/mzaf_12355254277297753434.plus.aac.p.m4a"
   },
   {
     "title": "Saturn",
@@ -213,7 +291,10 @@
     "bpm": 100,
     "key": "9B",
     "genre": "R&B",
-    "energy": 4
+    "energy": 4,
+    "confidence": "medium",
+    "confidence_note": "I recognize 'Saturn' by SZA as a real track but cannot verify these specific technical values from memory with certainty, as BPM and Camelot key require precise audio analysis and my training data may not include reliably accurate metadata for this specific recording.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7c/28/b3/7c28b3ed-9aa9-6454-92c6-e46d20849bed/mzaf_518591709818271733.plus.aac.p.m4a"
   },
   {
     "title": "Janice STFU",
@@ -221,7 +302,10 @@
     "bpm": 142,
     "key": "8A",
     "genre": "Hip-Hop",
-    "energy": 7
+    "energy": 7,
+    "confidence": "low",
+    "confidence_note": "I have no verified knowledge of a Drake track called 'Janice STFU' or its audio characteristics, so I cannot confirm these values are accurate rather than rough estimates or even fabricated metadata.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/c6/d7/d1/c6d7d1ec-84e6-ef8a-e02a-70d0ebb556be/mzaf_12941739828801829931.plus.aac.p.m4a"
   },
   {
     "title": "TSU",
@@ -229,6 +313,20 @@
     "bpm": 130,
     "key": "8A",
     "genre": "Hip-Hop",
-    "energy": 7
+    "energy": 7,
+    "confidence": "low",
+    "confidence_note": "I have no reliable knowledge of a Drake track called 'TSU' or its verified production metadata, so I cannot confirm these values are accurate rather than estimated or fabricated.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/e9/f8/26/e9f82604-ce86-86a4-c3eb-d23454fac120/mzaf_7715343894008292811.plus.aac.p.m4a"
+  },
+  {
+    "title": "Moth to a Flame",
+    "artist": "Swedish House Mafia & The Weeknd",
+    "bpm": 114,
+    "key": "8B",
+    "genre": "Pop/R&B",
+    "energy": 6,
+    "confidence": "low",
+    "confidence_note": "I do not have reliable recalled data for this specific track's tempo and key, so these are estimates based on The Weeknd's general stylistic range and the song's feel.",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/26/33/d2/2633d2b9-58f1-f9c0-7b43-b9d5ab1e5005/mzaf_15573204222455676396.plus.aac.p.m4a"
   }
 ]
