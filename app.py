@@ -1,8 +1,10 @@
+import fcntl
 import json
 import logging
 import os
 import re
 import secrets
+import tempfile
 from datetime import timedelta
 
 import requests
@@ -10,6 +12,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, request, session, url_for
+
+import dj_logic
+from audio_analysis import AudioAnalysisError, analyse_preview
 
 load_dotenv()
 
@@ -29,6 +34,8 @@ ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
 SEED_LIBRARY_PATH = "library.json"
 VISITOR_LIBRARIES_PATH = "visitor_libraries.json"
 MB_TIMEOUT = 10
+CLAUDE_TIMEOUT = 60
+SHORTLIST_SIZE = 15
 
 _retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
 _session = requests.Session()
@@ -83,15 +90,32 @@ def _mb_search(query: str, limit: int = 5) -> list:
     return resp.json().get("recordings", [])
 
 
+def _pick_recording(results: list, typed_track: str) -> dict | None:
+    """Chooses the best confident MusicBrainz match.
+
+    MusicBrainz often scores an instrumental/remix/live recording as highly
+    as the original, so unless the user actually asked for one of those,
+    prefer a confident match whose title isn't an alternate version.
+    """
+    confident = [r for r in results if r.get("score", 0) >= 85]
+    if not confident:
+        return None
+    if _is_alt_version(typed_track):
+        return confident[0]
+    originals = [r for r in confident if not _is_alt_version(r.get("title", ""))]
+    return (originals or confident)[0]
+
+
 def search_musicbrainz(track: str, artist: str) -> tuple:
     """Returns (best_match_dict, suggestions_list).
 
     Tries a strict quoted query first; falls back to an unquoted fuzzy query
     to populate suggestions when the strict search returns nothing or low confidence.
     """
-    strict = _mb_search(f'recording:"{track}" AND artist:"{artist}"')
-    if strict and strict[0].get("score", 0) >= 85:
-        return _mb_fetch_details(strict[0]["id"], track, artist), []
+    strict = _mb_search(f'recording:"{track}" AND artist:"{artist}"', limit=10)
+    best = _pick_recording(strict, track)
+    if best:
+        return _mb_fetch_details(best["id"], track, artist), []
 
     # Strict query failed or low confidence — try fuzzy (no quotes)
     fuzzy = _mb_search(f"recording:{track} artist:{artist}")
@@ -165,6 +189,23 @@ def get_visitor_id() -> str:
     return session["visitor_id"]
 
 
+class _FileLock:
+    """Cross-process lock so concurrent requests (or multiple gunicorn
+    workers) can't interleave a read-modify-write of the libraries file."""
+
+    def __init__(self, path):
+        self.path = path + ".lock"
+
+    def __enter__(self):
+        self._fh = open(self.path, "w")
+        fcntl.flock(self._fh, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        fcntl.flock(self._fh, fcntl.LOCK_UN)
+        self._fh.close()
+
+
 def _load_all_visitor_libraries() -> dict:
     if not os.path.exists(VISITOR_LIBRARIES_PATH):
         return {}
@@ -173,23 +214,35 @@ def _load_all_visitor_libraries() -> dict:
 
 
 def _save_all_visitor_libraries(data: dict) -> None:
-    with open(VISITOR_LIBRARIES_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    # Write to a temp file then atomically swap it in, so a crash mid-write
+    # can never leave a half-written (corrupt) JSON file behind.
+    directory = os.path.dirname(os.path.abspath(VISITOR_LIBRARIES_PATH))
+    fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, VISITOR_LIBRARIES_PATH)
+    except BaseException:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
 
 def load_library(visitor_id: str) -> list:
-    data = _load_all_visitor_libraries()
-    if visitor_id not in data:
-        with open(SEED_LIBRARY_PATH) as f:
-            data[visitor_id] = json.load(f)
-        _save_all_visitor_libraries(data)
-    return data[visitor_id]
+    with _FileLock(VISITOR_LIBRARIES_PATH):
+        data = _load_all_visitor_libraries()
+        if visitor_id not in data:
+            with open(SEED_LIBRARY_PATH) as f:
+                data[visitor_id] = json.load(f)
+            _save_all_visitor_libraries(data)
+        return data[visitor_id]
 
 
 def save_library(visitor_id: str, library: list) -> None:
-    data = _load_all_visitor_libraries()
-    data[visitor_id] = library
-    _save_all_visitor_libraries(data)
+    with _FileLock(VISITOR_LIBRARIES_PATH):
+        data = _load_all_visitor_libraries()
+        data[visitor_id] = library
+        _save_all_visitor_libraries(data)
 
 
 def call_claude(prompt: str, max_tokens: int = 512) -> str:
@@ -208,6 +261,7 @@ def call_claude(prompt: str, max_tokens: int = 512) -> str:
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         },
+        timeout=CLAUDE_TIMEOUT,
     )
     if not resp.ok:
         raise RuntimeError(f"Anthropic API error {resp.status_code}: {resp.text}")
@@ -240,46 +294,213 @@ Respond ONLY with a JSON object, no other text:
     return parse_json_response(call_claude(prompt, max_tokens=300))
 
 
-def recommend_next_track(track: str, artist: str, mb_info: dict, library: list) -> dict:
-    prompt = f"""You are an expert DJ assistant. Recommend the best next track to play after the current one.
+def build_track_metadata(track: str, artist: str, mb_info: dict, preview_url: str | None) -> dict:
+    """BPM and key are measured from the audio preview when possible; the LLM
+    supplies the subjective fields (energy, genre) and is the fallback for
+    BPM/key when there's no preview or analysis fails.
 
-Current track:
-- Title: {track}
-- Artist: {artist}
+    The LLM's own BPM/key guesses are kept alongside (`llm_bpm`, `llm_key`) so
+    the two sources can be compared — see scripts/analyse_library.py.
+    """
+    llm = get_track_metadata(track, artist, mb_info)
+    meta = {
+        "bpm": llm.get("bpm") or 0,
+        "key": llm.get("key") or "1A",
+        "genre": llm.get("genre") or "Unknown",
+        "energy": llm.get("energy") or 5,
+        "llm_bpm": llm.get("bpm"),
+        "llm_key": llm.get("key"),
+        "source": "llm",
+        "confidence": llm.get("confidence") or "low",
+        "confidence_note": llm.get("confidence_note") or "",
+    }
+
+    if preview_url:
+        try:
+            audio = analyse_preview(preview_url, session=_session)
+            meta.update({
+                "bpm": audio["bpm"],
+                "key": audio["key"],
+                "source": "audio",
+                "confidence": audio["confidence"],
+                "confidence_note": (
+                    f"Measured from the audio preview: {audio['bpm']} BPM "
+                    f"({audio['bpm_confidence']} confidence), {audio['key_name']} "
+                    f"({audio['key_confidence']} confidence)."
+                ),
+            })
+        except AudioAnalysisError:
+            logging.exception("Audio analysis failed; falling back to LLM estimate")
+    return meta
+
+
+def find_in_library(track: str, artist: str, library: list) -> dict | None:
+    probe = {"title": track, "artist": artist}
+    return next((t for t in library if dj_logic.same_track(probe, t)), None)
+
+
+def _track_view(t: dict) -> dict:
+    return {
+        "title": t.get("title", ""),
+        "artist": t.get("artist", ""),
+        "bpm": t.get("bpm"),
+        "key": t.get("key"),
+        "energy": t.get("energy"),
+        "genre": t.get("genre"),
+    }
+
+
+def recommend_next_track(current: dict, mb_info: dict, library: list) -> dict:
+    """Two-stage recommender.
+
+    1. Python ranks the library by Camelot/BPM/energy compatibility and keeps
+       the top SHORTLIST_SIZE candidates.
+    2. Claude picks from that shortlist *by ID* and writes the explanation,
+       weighing vibe and genre, which rules can't capture.
+
+    The model's answer is then validated: unknown or duplicate IDs are
+    replaced with the best-scoring valid track, and BPM/key figures shown to
+    the user always come from the library, never from model output. If the
+    API call fails entirely, a fully rule-based recommendation is returned.
+    """
+    candidates = dj_logic.shortlist(current, library, limit=SHORTLIST_SIZE)
+    if not candidates:
+        raise RuntimeError("Your library needs at least one other track to recommend from.")
+
+    by_id = {f"t{n + 1}": c for n, c in enumerate(candidates)}
+    lines = []
+    for cid, (_, t, tr) in by_id.items():
+        lines.append(
+            f'{cid}: "{t.get("title")}" by {t.get("artist")} | {t.get("bpm")} BPM | '
+            f'{t.get("key")} | energy {t.get("energy")} | {t.get("genre")} | '
+            f'match {tr["score"]:.2f} ({tr["key_label"]}; {tr["bpm_label"]}; {tr["energy_label"]})'
+        )
+
+    prompt = f"""You are an expert DJ assistant. Choose what to play after the current track.
+
+Current track: "{current.get('title')}" by {current.get('artist')}
+- {current.get('bpm')} BPM, key {current.get('key')} (Camelot), energy {current.get('energy')}/10
 - MusicBrainz tags: {_safe_tags(mb_info)}
 - Genres: {", ".join(g[:50] for g in mb_info.get("genres", [])[:10]) or "none found"}
 
-DJ Library (title / artist / bpm / key in Camelot notation):
-{json.dumps(library, indent=2)}
+These candidates have already been checked for harmonic and tempo compatibility
+and ranked by a match score (key, BPM incl. half/double time, energy flow).
+You may ONLY choose from these IDs:
+{chr(10).join(lines)}
 
-Selection criteria (in priority order):
-1. Camelot Wheel key compatibility — same key, ±1 step, or relative major/minor (+3 or -3)
-2. BPM compatibility — ideally within ±3 BPM; double/half-time also works
-3. Energy and vibe — consider genre tags to maintain or build energy naturally
+Use the match scores as a strong guide, but use your judgement on vibe, mood
+and genre flow — e.g. prefer a slightly lower score if the vibe is much better.
 
-Respond with ONLY a JSON object in this exact format, no other text:
+Respond with ONLY a JSON object, no other text:
 {{
-  "recommended_track": "track title",
-  "recommended_artist": "artist name",
-  "bpm_compatibility": "2-3 sentences on BPM delta and whether it works",
+  "recommended_id": "t?",
+  "bpm_compatibility": "2-3 sentences on the BPM relationship and whether it works",
   "energy_vibes": "2-3 sentences on energy level, mood, and genre fit",
-  "summary": "1 punchy paragraph tying it all together — why this is the perfect next track",
-  "alternatives": [
-    {{"title": "track title", "artist": "artist name", "reason": "one sentence on why this also works"}},
-    {{"title": "track title", "artist": "artist name", "reason": "one sentence on why this also works"}},
-    {{"title": "track title", "artist": "artist name", "reason": "one sentence on why this also works"}}
-  ],
-  "chain": [
-    {{"title": "track title", "artist": "artist name", "bpm": 0, "key": "0A", "reason": "one sentence on the transition from the recommended track"}},
-    {{"title": "track title", "artist": "artist name", "bpm": 0, "key": "0A", "reason": "one sentence on the transition from track 1"}},
-    {{"title": "track title", "artist": "artist name", "bpm": 0, "key": "0A", "reason": "one sentence on the transition from track 2"}}
-  ]
+  "summary": "1 punchy paragraph — why this is the right next track",
+  "alternatives": [{{"id": "t?", "reason": "one sentence"}}, {{"id": "t?", "reason": "one sentence"}}, {{"id": "t?", "reason": "one sentence"}}],
+  "chain": [{{"id": "t?", "reason": "one sentence on the transition from the recommended track"}}, {{"id": "t?", "reason": "transition from chain track 1"}}, {{"id": "t?", "reason": "transition from chain track 2"}}]
 }}
 
-For alternatives: pick 3 other good options from the library (not the recommended track).
-For chain: pick 3 tracks from the library that should follow the recommended track in order, building a coherent set. Do not repeat the recommended track or any alternative."""
+Alternatives: 3 other IDs, not the recommended one. Chain: 3 IDs that follow the
+recommended track in order to build a coherent set; don't repeat any ID used above."""
 
-    return parse_json_response(call_claude(prompt, max_tokens=2048))
+    try:
+        raw = parse_json_response(call_claude(prompt, max_tokens=1500))
+    except Exception:
+        logging.exception("LLM recommendation failed; using rule-based fallback")
+        raw = {}
+
+    return _assemble_recommendation(current, library, by_id, raw)
+
+
+def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dict) -> dict:
+    """Turns the model's ID-based answer into the template's format, fixing
+    anything invalid so the user never sees a track that isn't in their library."""
+    ranked_ids = list(by_id)  # already best-first
+    used = set()
+    replaced = 0
+
+    def take(cid):
+        nonlocal replaced
+        if cid in by_id and cid not in used:
+            used.add(cid)
+            return cid, False
+        for fallback in ranked_ids:
+            if fallback not in used:
+                used.add(fallback)
+                replaced += 1
+                return fallback, True
+        return None, True
+
+    rec_id, rec_replaced = take(raw.get("recommended_id"))
+    _, rec_track, rec_tr = by_id[rec_id]
+
+    result = {
+        "recommended_track": rec_track.get("title"),
+        "recommended_artist": rec_track.get("artist"),
+        "recommended_bpm": rec_track.get("bpm"),
+        "recommended_key": rec_track.get("key"),
+        "match_score": round(rec_tr["score"] * 100),
+        "bpm_compatibility": raw.get("bpm_compatibility") if not rec_replaced else None,
+        "energy_vibes": raw.get("energy_vibes") if not rec_replaced else None,
+        "summary": raw.get("summary") if not rec_replaced else None,
+        "alternatives": [],
+        "chain": [],
+    }
+    if not result["bpm_compatibility"]:
+        result["bpm_compatibility"] = (
+            f"{current.get('bpm')} → {rec_track.get('bpm')} BPM: {rec_tr['bpm_label']}."
+        )
+    if not result["energy_vibes"]:
+        result["energy_vibes"] = (
+            f"Energy {current.get('energy')} → {rec_track.get('energy')}: {rec_tr['energy_label']}."
+        )
+    if not result["summary"]:
+        result["summary"] = (
+            f"Top-ranked match from your library: {dj_logic.describe_transition(current, rec_track)}"
+        )
+
+    # Alternatives: must come from the shortlist.
+    for alt in (raw.get("alternatives") or [])[:3]:
+        cid, was_replaced = take(alt.get("id") if isinstance(alt, dict) else None)
+        if cid is None:
+            break
+        _, t, _ = by_id[cid]
+        reason = alt.get("reason") if not was_replaced else None
+        result["alternatives"].append({
+            **_track_view(t),
+            "reason": reason or dj_logic.describe_transition(current, t),
+        })
+    while len(result["alternatives"]) < 3:
+        cid, _ = take(None)
+        if cid is None:
+            break
+        _, t, _ = by_id[cid]
+        result["alternatives"].append({**_track_view(t), "reason": dj_logic.describe_transition(current, t)})
+
+    # Chain: each step must be a real track AND mix well from the previous one.
+    prev = rec_track
+    for step in (raw.get("chain") or [])[:3]:
+        cid = step.get("id") if isinstance(step, dict) else None
+        if cid not in by_id or cid in used:
+            break
+        _, t, _ = by_id[cid]
+        if dj_logic.transition(prev, t)["key_score"] == 0.0:
+            break  # key clash — stop trusting the model's chain from here
+        used.add(cid)
+        result["chain"].append({**_track_view(t), "reason": step.get("reason") or dj_logic.describe_transition(prev, t)})
+        prev = t
+
+    if len(result["chain"]) < 3:
+        exclude = {by_id[c][0] for c in used}
+        exclude |= {i for i, t in enumerate(library) if dj_logic.same_track(t, current)}
+        for _, t, _ in dj_logic.build_chain(prev, library, exclude, length=3 - len(result["chain"])):
+            result["chain"].append({**_track_view(t), "reason": dj_logic.describe_transition(prev, t)})
+            replaced += 1
+            prev = t
+
+    result["llm_corrections"] = replaced
+    return result
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -312,7 +533,16 @@ def index():
                     search_error = f'We couldn\'t find "{track}" by {artist}. Please check the spelling or try one of the suggestions below.'
                 else:
                     mb_artist = mb_info.get("artist") or artist
-                    rec = recommend_next_track(track, mb_artist, mb_info, load_library(visitor_id))
+                    mb_title = mb_info.get("title") or track
+                    lib = load_library(visitor_id)
+                    # Use stored BPM/key if the track is already in the library;
+                    # otherwise measure it so the shortlist has real numbers.
+                    current = find_in_library(mb_title, mb_artist, lib) or find_in_library(track, mb_artist, lib)
+                    if current is None:
+                        preview = get_preview_url(track, mb_artist)
+                        meta = build_track_metadata(track, mb_artist, mb_info, preview)
+                        current = {"title": mb_title, "artist": mb_artist, **meta}
+                    rec = recommend_next_track(current, mb_info, lib)
             except Exception as e:
                 logging.exception("Search error")
                 search_error = "Something went wrong. Please try again."
@@ -361,19 +591,14 @@ def add_track():
             if stored_artist == mb_artist.lower() and (stored_title == track.lower() or stored_title == mb_title):
                 return redirect(url_for("index", add_warning=f'"{t["title"]}" by {t["artist"]} is already in your library.'))
 
-        metadata = get_track_metadata(track, mb_artist, mb_info)
-        confidence = metadata.get("confidence") or "low"
         preview_url = get_preview_url(track, mb_artist)
+        metadata = build_track_metadata(track, mb_artist, mb_info, preview_url)
+        confidence = metadata["confidence"]
 
         library.append({
             "title": mb_info.get("title", track),
             "artist": mb_artist,
-            "bpm": metadata.get("bpm") or 0,
-            "key": metadata.get("key") or "1A",
-            "genre": metadata.get("genre") or "Unknown",
-            "energy": metadata.get("energy") or 5,
-            "confidence": confidence,
-            "confidence_note": metadata.get("confidence_note") or "",
+            **metadata,
             "preview_url": preview_url,
         })
         save_library(visitor_id, library)

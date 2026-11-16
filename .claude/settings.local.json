@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Skill(claude-api)"
+      "Skill(claude-api)",
+      "WebSearch",
+      "Bash(python3 *)",
+      "Bash(curl -s -o /tmp/preview_test.m4a \"https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/17/b4/8f/17b48f9a-0b93-6bb8-fe1d-3a16623c2cfb/mzaf_9560252727299052414.plus.aac.p.m4a\")",
+      "Bash(afinfo /tmp/preview_test.m4a)",
+      "Bash(open *)"
     ]
   }
 }
