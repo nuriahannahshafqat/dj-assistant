@@ -614,6 +614,13 @@
       filter: brightness(1.4);
     }
 
+    /* On phones "Deck A · Now Playing" wraps but "Deck B · Up Next" doesn't,
+       which pushed Deck A's record lower. Put the tag on its own line for both. */
+    @media (max-width: 600px) {
+      .deck-sep { display: none; }
+      .deck-tag { display: block; margin-top: 2px; }
+    }
+
     .vinyl {
       position: relative;
       width: 100%;
@@ -1116,7 +1123,15 @@
     @media (max-width: 900px) {
       .page-grid {
         grid-template-columns: 1fr;
+        gap: 32px;
       }
+      /* Stacked on phones: search (and its results) first, then the
+         alternatives next to the mixer, then Add to Library. */
+      .search-section { order: 1; }
+      .col-alts { order: 2; }
+      .col-library { order: 3; }
+      /* Before a search the alternatives column is empty; don't leave a gap for it */
+      .col-alts:not(:has(.alt-section)) { display: none; }
       .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .find-panel { min-height: 0; max-width: none; }
       header h1 { font-size: 2rem; gap: 12px; }
@@ -1182,7 +1197,7 @@
   <div class="page-grid">
 
     <!-- ── Left: Add to Library ── -->
-    <div>
+    <div class="col-library">
       <div class="panel add-form">
         <div class="panel-title">Add to Library</div>
         <form action="/add" method="POST" onsubmit="startAddLoading()">
@@ -1371,7 +1386,7 @@
         <div class="decks">
           {% for id, d, tag in [('a', rec.deck_a, 'Now Playing'), ('b', rec.deck_b, 'Up Next')] %}
           <div class="deck deck-{{ id }}" data-deck="{{ id }}" data-preview="{{ d.preview_url or '' }}" data-bpm="{{ d.bpm or '' }}">
-            <div class="deck-label">Deck {{ id | upper }} · {{ tag }}</div>
+            <div class="deck-label">Deck {{ id | upper }}<span class="deck-sep"> · </span><span class="deck-tag">{{ tag }}</span></div>
             <div class="vinyl" role="img" aria-label="Record for {{ d.title }}">
               <div class="vinyl-label"><span>{{ id | upper }}</span></div>
             </div>
@@ -1429,7 +1444,7 @@
     </div>
 
     <!-- ── Right: Alternatives ── -->
-    <div>
+    <div class="col-alts">
       {% if rec and rec.options and rec.options | length > 1 %}
       <div class="alt-section">
         <div class="panel-title" style="padding-left:2px;margin-bottom:0">Alternatives</div>
@@ -1858,7 +1873,9 @@
         }
         if (on) {
           const pct = (ratio - 1) * 100;
-          b.pitchEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+          // Round first so a tiny tempo difference reads "0.0%", not "-0.0%"
+          const shown = Math.round(pct * 10) / 10;
+          b.pitchEl.textContent = (shown > 0 ? '+' : '') + (shown === 0 ? '0.0' : shown.toFixed(1)) + '%';
           syncBtn.classList.add('active');
           syncBtn.textContent = 'Synced ✓';
         } else {
@@ -1885,7 +1902,9 @@
         }
         setSync(true, ratio);
         const pct = (ratio - 1) * 100;
-        let msg = 'Deck B pitched ' + (pct >= 0 ? 'up ' : 'down ') + Math.abs(pct).toFixed(1) + '%';
+        let msg = Math.abs(pct) < 0.05
+          ? 'Tempos already match'
+          : 'Deck B pitched ' + (pct >= 0 ? 'up ' : 'down ') + Math.abs(pct).toFixed(1) + '%';
         if (!a.audio.paused && !b.audio.paused) {
           const token = ++mixToken;
           if (await alignBeats(a, b, token)) msg += ' and beats lined up';
