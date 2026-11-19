@@ -3,3 +3,9 @@
 __pycache__/
 *.pyc
 visitor_libraries.json
+
+# Local-only files
+.claude/settings.local.json
+*.lock
+analysis_report.csv
+*.bak

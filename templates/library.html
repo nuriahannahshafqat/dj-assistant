@@ -15,6 +15,57 @@
       padding: 0 24px 80px;
     }
 
+    /* ── Page backdrop: slow-drifting deck-colour glows + a giant spinning record ── */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -20%;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(38% 32% at 18% 22%, rgba(124, 58, 237, 0.32), transparent 70%),
+        radial-gradient(34% 30% at 82% 68%, rgba(219, 39, 119, 0.22), transparent 70%),
+        radial-gradient(40% 30% at 50% 105%, rgba(56, 189, 248, 0.10), transparent 70%);
+      animation: glow-drift 28s ease-in-out infinite alternate;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      z-index: -1;
+      pointer-events: none;
+      width: 920px;
+      height: 920px;
+      right: -300px;
+      bottom: -320px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, #0d0d0d 0 1.2%, #3b1f6e 1.2% 9%, #0d0d0d 9% 10.5%, transparent 10.5%),
+        conic-gradient(from 0deg, transparent 0 40deg, rgba(255, 255, 255, 0.09) 60deg, transparent 80deg 220deg, rgba(255, 255, 255, 0.06) 240deg, transparent 260deg),
+        repeating-radial-gradient(circle, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 5px),
+        #17131d;
+      opacity: 0.85;
+      -webkit-mask-image: radial-gradient(circle, #000 64%, transparent 71%);
+              mask-image: radial-gradient(circle, #000 64%, transparent 71%);
+      animation: record-spin 40s linear infinite;
+    }
+
+    @keyframes glow-drift {
+      0%   { transform: translate(0, 0) scale(1); }
+      50%  { transform: translate(4%, -3%) scale(1.06); }
+      100% { transform: translate(-3%, 4%) scale(1); }
+    }
+
+    @keyframes record-spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::before, body::after { animation: none; }
+    }
+
+    @media (max-width: 700px) {
+      body::after { width: 560px; height: 560px; right: -260px; bottom: -260px; }
+    }
+
     .wrap { max-width: 1100px; margin: 0 auto; }
 
     .topnav {
@@ -35,33 +86,147 @@
       justify-content: space-between;
     }
 
+    .topnav {
+      background: linear-gradient(180deg, #141019 0%, #0b0a0e 100%);
+      border-bottom: 1px solid #241b33;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+      padding: 18px 24px;
+    }
+
+    .topnav-inner { gap: 28px; }
+
+    /* Brand reads like the station ident on a radio faceplate */
     .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      flex-shrink: 0;
       color: #fff;
       font-weight: 700;
-      font-size: 1rem;
+      font-size: 1.2rem;
       text-decoration: none;
       letter-spacing: -0.3px;
     }
 
-    .nav-links { display: flex; gap: 6px; }
-
-    .nav-link {
-      color: #999;
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid transparent;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    .on-air {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f43f5e;
+      box-shadow: 0 0 8px #f43f5e;
+      animation: on-air-pulse 2.4s ease-in-out infinite;
     }
 
-    .nav-link:hover { color: #fff; border-color: #333; }
-
-    .nav-link.active {
-      background: #2e1065;
+    .brand-fm {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
       color: #c4b5fd;
-      border-color: #4c1d95;
+      border: 1px solid #4c1d95;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+
+    @keyframes on-air-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    /* ── Tuner dial: pages are stations on an FM scale (88–108 MHz) ── */
+    .dial {
+      position: relative;
+      flex: 1;
+      max-width: 620px;
+      min-width: 200px;
+      height: 66px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #1a1422 0%, #0f0c14 100%);
+      border: 1px solid #2a2036;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    .dial-track {
+      position: absolute;
+      inset: 0 18px;
+    }
+
+    .dial-ticks {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 44px;
+      height: 9px;
+      background: repeating-linear-gradient(to right, #3d3250 0 1px, transparent 1px 10%);
+      border-right: 1px solid #3d3250;
+    }
+
+    .station {
+      position: absolute;
+      top: 12px;
+      left: var(--pos);
+      transform: translateX(-50%);
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      white-space: nowrap;
+      color: #8a8098;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: color 0.2s, text-shadow 0.2s;
+      z-index: 2;
+    }
+
+    .station .freq {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #5c4f70;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.2s;
+    }
+
+    .station:hover,
+    .station:focus-visible { color: #fff; }
+
+    .station:focus-visible { outline: 2px solid #7c3aed; outline-offset: 3px; border-radius: 3px; }
+
+    .station.active {
+      color: #e9d5ff;
+      text-shadow: 0 0 10px rgba(167, 139, 250, 0.8);
+    }
+
+    .station.active .freq,
+    .station:hover .freq { color: #c4b5fd; }
+
+    /* The needle sits on the current page and glides to whatever you hover */
+    .needle {
+      position: absolute;
+      top: 36px;
+      bottom: 6px;
+      left: var(--needle);
+      width: 2px;
+      margin-left: -1px;
+      border-radius: 1px;
+      background: #f43f5e;
+      box-shadow: 0 0 6px #f43f5e, 0 0 14px rgba(244, 63, 94, 0.5);
+      transition: left 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .on-air { animation: none; }
+      .needle { transition: none; }
+    }
+
+    @media (max-width: 560px) {
+      .topnav-inner { flex-wrap: wrap; gap: 8px; }
+      .dial { flex-basis: 100%; max-width: none; }
+      .station .freq { display: none; }
+      .station { font-size: 0.8rem; }
     }
 
     .search-input {
@@ -161,6 +326,16 @@
 
     .remove-btn:hover { border-color: #7f1d1d; background: #2a1111; color: #fca5a5; }
 
+    .no-clip {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #7a7a7a;
+      border: 1px dashed #3a3a3a;
+      border-radius: 6px;
+      padding: 3px 7px;
+      white-space: nowrap;
+    }
+
     .preview-btn {
       width: 24px;
       height: 24px;
@@ -198,18 +373,45 @@
     }
 
     .empty { color: #666; font-size: 0.92rem; }
+    .toast-transient { transition: opacity 0.3s ease, transform 0.3s ease; }
+    .toast-hide { opacity: 0; transform: translateY(-4px); }
   </style>
 </head>
 <body>
   <nav class="topnav">
     <div class="topnav-inner">
-      <a href="/" class="brand">DJ Assistant</a>
-      <div class="nav-links">
-        <a href="/" class="nav-link {{ 'active' if active_page == 'home' else '' }}">Find Track</a>
-        <a href="/library" class="nav-link {{ 'active' if active_page == 'library' else '' }}">Library</a>
+      <a href="/" class="brand"><span class="on-air" aria-hidden="true"></span>DJ Assistant<span class="brand-fm">FM</span></a>
+      {%- set stations = [('home', '/', 'Find Track', 95.5), ('library', '/library', 'Library', 103.5)] %}
+      {%- set ns = namespace(needle=37.5) %}
+      {%- for page, href, label, mhz in stations if page == active_page %}{% set ns.needle = (mhz - 88) * 5 %}{% endfor %}
+      <div class="dial" style="--needle: {{ ns.needle }}%">
+        <div class="dial-track">
+          <div class="dial-ticks" aria-hidden="true"></div>
+          {%- for page, href, label, mhz in stations %}
+          <a href="{{ href }}" class="station {{ 'active' if active_page == page else '' }}" style="--pos: {{ (mhz - 88) * 5 }}%"{{ ' aria-current="page"' | safe if active_page == page else '' }}><span class="freq">{{ mhz }}</span>{{ label }}</a>
+          {%- endfor %}
+          <span class="needle" aria-hidden="true"></span>
+        </div>
       </div>
     </div>
   </nav>
+
+  <script>
+    // Hovering or focusing a station slides the tuner needle to it.
+    (function () {
+      const dial = document.querySelector('.dial');
+      if (!dial) return;
+      const home = dial.style.getPropertyValue('--needle');
+      dial.querySelectorAll('.station').forEach(function (s) {
+        const tune = function () { dial.style.setProperty('--needle', s.style.getPropertyValue('--pos')); };
+        s.addEventListener('mouseenter', tune);
+        s.addEventListener('focus', tune);
+      });
+      const reset = function () { dial.style.setProperty('--needle', home); };
+      dial.addEventListener('mouseleave', reset);
+      dial.addEventListener('focusout', function (e) { if (!dial.contains(e.relatedTarget)) reset(); });
+    })();
+  </script>
 
   <div class="wrap">
     <header>
@@ -218,10 +420,10 @@
     <div class="subtitle">{{ library | length }} track{{ "" if library | length == 1 else "s" }}</div>
 
     {% if add_success %}
-    <div class="toast toast-success">✓ {{ add_success }}</div>
+    <div class="toast toast-success toast-transient" data-autohide role="status">✓ {{ add_success }}</div>
     {% endif %}
     {% if add_error %}
-    <div class="toast toast-error">⚠ {{ add_error }}</div>
+    <div class="toast toast-error toast-transient" role="alert">⚠ {{ add_error }}</div>
     {% endif %}
 
     {% if library %}
@@ -238,6 +440,8 @@
           <div class="card-actions">
             {% if t.preview_url %}
             <button type="button" class="preview-btn" data-url="{{ t.preview_url | e }}" onclick="togglePreview(this)" title="Play preview">▶</button>
+            {% else %}
+            <span class="no-clip" title="This song isn't on iTunes, so there's no preview clip to play">Not on iTunes</span>
             {% endif %}
             {% if t.confidence %}
             <span class="confidence-badge confidence-{{ t.confidence }}">{{ t.confidence }}</span>
@@ -305,6 +509,33 @@
       const noResults = document.getElementById('lib-no-results');
       if (noResults) noResults.style.display = (q && !anyVisible) ? 'block' : 'none';
     }
+  </script>
+  <script>
+    // Add/remove messages are one-off: success fades after a few seconds, and any
+    // message goes away as soon as you click or type somewhere else on the page.
+    (function () {
+      const toasts = Array.from(document.querySelectorAll('.toast-transient'));
+      if (!toasts.length) return;
+      function dismiss(t) {
+        if (!t.isConnected || t.classList.contains('toast-hide')) return;
+        t.classList.add('toast-hide');
+        setTimeout(function () { t.remove(); }, 300);
+      }
+      function dismissAll(e) {
+        if (e && e.target.closest && e.target.closest('.toast-transient')) return;   // reading/selecting it is fine
+        toasts.forEach(dismiss);
+        document.removeEventListener('pointerdown', dismissAll, true);
+        document.removeEventListener('keydown', dismissAll, true);
+      }
+      toasts.forEach(function (t) {
+        if (t.hasAttribute('data-autohide')) setTimeout(function () { dismiss(t); }, 5000);
+      });
+      // Short grace period so a click that was already on its way doesn't hide it instantly.
+      setTimeout(function () {
+        document.addEventListener('pointerdown', dismissAll, true);
+        document.addEventListener('keydown', dismissAll, true);
+      }, 600);
+    })();
   </script>
 </body>
 </html>

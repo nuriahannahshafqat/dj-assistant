@@ -1,3 +1,4 @@
+import difflib
 import fcntl
 import json
 import logging
@@ -5,6 +6,8 @@ import os
 import re
 import secrets
 import tempfile
+import threading
+import time
 from datetime import timedelta
 
 import requests
@@ -29,7 +32,10 @@ app.permanent_session_lifetime = timedelta(days=365)
 logging.basicConfig(level=logging.ERROR)
 
 MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2"
-MB_HEADERS = {"User-Agent": "dj-assistant/1.0 (nuriashafqat711@gmail.com)"}
+# MusicBrainz asks clients to identify themselves with a way to get in touch.
+# Set MB_CONTACT (an email or URL) in .env to use your own; it defaults to the repo.
+MB_CONTACT = os.getenv("MB_CONTACT") or "https://github.com/nuriahannahshafqat/dj-assistant"
+MB_HEADERS = {"User-Agent": f"dj-assistant/1.0 ( {MB_CONTACT} )"}
 ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
 SEED_LIBRARY_PATH = "library.json"
 VISITOR_LIBRARIES_PATH = "visitor_libraries.json"
@@ -37,7 +43,10 @@ MB_TIMEOUT = 10
 CLAUDE_TIMEOUT = 60
 SHORTLIST_SIZE = 15
 
-_retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+# Retry brief server hiccups, but never a timed-out read: a server that
+# isn't answering shouldn't keep the user waiting (search falls back to iTunes).
+_retry = Retry(total=3, read=0, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+MB_SEARCH_TIMEOUT = (4, 6)   # (connect, read) seconds
 _session = requests.Session()
 _session.mount("https://", HTTPAdapter(max_retries=_retry))
 
@@ -62,11 +71,12 @@ def _mb_artist_name(recording: dict) -> str:
 
 
 def _mb_fetch_details(rec_id: str, track: str, artist: str) -> dict:
+    _mb_wait_turn()
     detail = _session.get(
         f"{MUSICBRAINZ_BASE}/recording/{rec_id}",
         params={"inc": "tags+genres+artist-credits", "fmt": "json"},
         headers=MB_HEADERS,
-        timeout=MB_TIMEOUT,
+        timeout=MB_SEARCH_TIMEOUT,
     )
     detail.raise_for_status()
     data = detail.json()
@@ -79,12 +89,27 @@ def _mb_fetch_details(rec_id: str, track: str, artist: str) -> dict:
     }
 
 
+_MB_MIN_INTERVAL = 1.1      # MusicBrainz allows ~1 request/second per client
+_mb_last_call = [0.0]
+_mb_lock = threading.Lock()
+
+
+def _mb_wait_turn():
+    """Spaces out MusicBrainz calls; back-to-back queries otherwise get 503s."""
+    with _mb_lock:
+        wait = _mb_last_call[0] + _MB_MIN_INTERVAL - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _mb_last_call[0] = time.monotonic()
+
+
 def _mb_search(query: str, limit: int = 5) -> list:
+    _mb_wait_turn()
     resp = _session.get(
         f"{MUSICBRAINZ_BASE}/recording",
         params={"query": query, "fmt": "json", "limit": limit},
         headers=MB_HEADERS,
-        timeout=MB_TIMEOUT,
+        timeout=MB_SEARCH_TIMEOUT,
     )
     resp.raise_for_status()
     return resp.json().get("recordings", [])
@@ -106,34 +131,173 @@ def _pick_recording(results: list, typed_track: str) -> dict | None:
     return (originals or confident)[0]
 
 
+_LUCENE_SPECIAL = re.compile(r'[+\-&|!(){}\[\]^"~*?:\\/]')
+
+
+def _fuzzy_terms(text: str) -> str:
+    """'save ur tears' -> 'save~ ur~ tears~' (each word may be up to 2 edits off,
+    so slang/typos like 'ur' -> 'your' still match)."""
+    words = _LUCENE_SPECIAL.sub(" ", text).split()
+    return " ".join(f"{w}~" for w in words)
+
+
+def _words(s: str) -> str:
+    s = _FEAT_PATTERN.sub("", s or "")
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", s.lower()).split())
+
+
+def _similarity(a: str, b: str) -> float:
+    return difflib.SequenceMatcher(None, _words(a), _words(b)).ratio()
+
+
+MAX_SUGGESTIONS = 5
+_BRACKETS = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]")
+
+
+def _rank_suggestions(candidates: list, track: str, artist: str) -> list:
+    """Turns raw (title, artist) search hits into a short "Did you mean?" list.
+
+    Search engines score loosely (a cover of the song, or 'Save Ur Breath',
+    can outrank the real thing), so hits are re-scored by how close the title
+    and artist are to what was typed. Covers/remixes/karaoke are dropped unless
+    the user asked for one.
+    """
+    wants_alt = _is_alt_version(track)
+    target_artist = _ARTIST_SPLIT.split(artist.strip(), maxsplit=1)[0]
+    scored = []
+    for title, cand_artist in candidates:
+        if not title or not cand_artist:
+            continue
+        if not wants_alt and _is_alt_version(title):
+            continue
+        if " / " in title and "/" not in track:      # medleys, e.g. "The Morning / Save Your Tears"
+            continue
+        cand_main = _ARTIST_SPLIT.split(cand_artist.strip(), maxsplit=1)[0]
+        artist_sim = max(_similarity(target_artist, cand_main), _similarity(artist, cand_artist))
+        title_sim = _similarity(track, title)
+        if artist_sim < 0.6 or title_sim < 0.6:
+            continue
+        # Prefer the exact artist spelling and the plain title over "(edit)" etc.
+        scored.append((title_sim + artist_sim + (0.05 if title == _BRACKETS.sub("", title) else 0),
+                       title, cand_main, cand_artist))
+    scored.sort(key=lambda s: s[0], reverse=True)
+
+    # One suggestion per song: "Kill Bill (vocals)", "kill bill [nightcore]" and a
+    # mis-tagged "The Weekend" upload are all the same song as the top hit.
+    kept = []
+    for _, title, cand_main, cand_artist in scored:
+        base = _words(_BRACKETS.sub("", title))
+        if any(base == _words(_BRACKETS.sub("", k_title)) and _similarity(cand_main, k_main) >= 0.8
+               for k_title, k_main, _ in kept):
+            continue
+        kept.append((title, cand_main, cand_artist))
+        if len(kept) == MAX_SUGGESTIONS:
+            break
+    return [{"title": t, "artist": a} for t, _, a in kept]
+
+
+def _suggest(track: str, artist: str) -> list:
+    """Spelling-tolerant "Did you mean?" options for a search with no exact match."""
+    candidates = []
+    if _mb_available():
+        try:
+            fuzzy = _mb_search(
+                f"recording:({_fuzzy_terms(track)}) AND artist:({_fuzzy_terms(artist)})", limit=25
+            )
+            candidates = [(r.get("title", ""), _mb_artist_name(r)) for r in fuzzy]
+        except requests.RequestException:
+            logging.warning("MusicBrainz fuzzy search failed", exc_info=True)
+            _mark_mb_down()
+
+    suggestions = _rank_suggestions(candidates, track, artist)
+    if suggestions:
+        return suggestions
+
+    # iTunes search copes well with slang and partial titles, so try it too.
+    try:
+        hits = _itunes_search(f"{track} {artist}", 25)
+        candidates = [(h.get("trackName", ""), h.get("artistName", "")) for h in hits]
+    except requests.RequestException:
+        logging.exception("iTunes suggestion search failed")
+        return []
+    return _rank_suggestions(candidates, track, artist)
+
+
+class SearchUnavailable(Exception):
+    """Neither MusicBrainz nor iTunes could be reached."""
+
+
+# When MusicBrainz is down (it returns 502s or hangs), don't make every search
+# wait on it again: skip straight to iTunes for a minute.
+_MB_COOLDOWN = 60
+_mb_down_until = [0.0]
+
+
+def _mb_available() -> bool:
+    return time.monotonic() >= _mb_down_until[0]
+
+
+def _mark_mb_down():
+    _mb_down_until[0] = time.monotonic() + _MB_COOLDOWN
+
+
+def _search_itunes(track: str, artist: str) -> tuple:
+    """Same contract as search_musicbrainz, using iTunes only (fallback)."""
+    try:
+        hits = _itunes_search(f"{track} {artist}", 25)
+    except requests.RequestException as e:
+        raise SearchUnavailable() from e
+    best = _pick_itunes_result(hits, track, artist, require_preview=False)
+    if best:
+        genre = best.get("primaryGenreName")
+        return {"title": best.get("trackName", track), "artist": best.get("artistName", artist),
+                "mbid": None, "tags": [], "genres": [genre] if genre else []}, []
+    candidates = [(h.get("trackName", ""), h.get("artistName", "")) for h in hits]
+    return {}, _rank_suggestions(candidates, track, artist)
+
+
 def search_musicbrainz(track: str, artist: str) -> tuple:
     """Returns (best_match_dict, suggestions_list).
 
-    Tries a strict quoted query first; falls back to an unquoted fuzzy query
-    to populate suggestions when the strict search returns nothing or low confidence.
+    Only an exact (quoted) title + artist match is used directly. Anything
+    looser - misspellings, slang like 'ur' for 'your' - comes back as
+    suggestions for the user to pick from, so we never silently search for a
+    different song than the one they meant.
+
+    Falls back to iTunes when MusicBrainz is down; raises SearchUnavailable
+    if iTunes can't be reached either.
     """
-    strict = _mb_search(f'recording:"{track}" AND artist:"{artist}"', limit=10)
-    best = _pick_recording(strict, track)
-    if best:
-        return _mb_fetch_details(best["id"], track, artist), []
+    if not _mb_available():
+        return _search_itunes(track, artist)
+    try:
+        strict = _mb_search(f'recording:"{track}" AND artist:"{artist}"', limit=10)
+        best = _pick_recording(strict, track)
+        if best:
+            return _mb_fetch_details(best["id"], track, artist), []
+    except requests.RequestException:
+        logging.warning("MusicBrainz unavailable, falling back to iTunes", exc_info=True)
+        _mark_mb_down()
+        return _search_itunes(track, artist)
+    return {}, _suggest(track, artist)
 
-    # Strict query failed or low confidence — try fuzzy (no quotes)
-    fuzzy = _mb_search(f"recording:{track} artist:{artist}")
 
-    # Deduplicate by (title, artist) preserving order
-    seen = set()
-    suggestions = []
-    for r in (strict + fuzzy):
-        if r.get("score", 0) < 40:
-            continue
-        key = (r.get("title", "").lower(), _mb_artist_name(r).lower())
-        if key not in seen:
-            seen.add(key)
-            suggestions.append({"title": r.get("title", ""), "artist": _mb_artist_name(r)})
-        if len(suggestions) == 5:
-            break
+SEARCH_UNAVAILABLE_MSG = ("The music databases we search (MusicBrainz and iTunes) aren't responding "
+                          "right now, so we can't look songs up. Please try again in a few minutes.")
 
-    return {}, suggestions
+
+def not_found_message(track: str, artist: str, suggestions: list) -> str:
+    if suggestions:
+        return f'Couldn\'t find an exact match for "{track}" by {artist}. Did you mean one of these?'
+    # The page lists tips underneath (SEARCH_TIPS) when there are no suggestions.
+    return f'Unable to find "{track}" by {artist}. A few things to try:'
+
+
+SEARCH_TIPS = [
+    'Write words out in full, e.g. "your" instead of "ur"',
+    "Check the spelling of the song title and the artist",
+    "Make sure the artist is the one who actually released that song",
+    "Some songs aren't listed on MusicBrainz or iTunes (the music databases we search), so they can't be found",
+]
 
 
 _FEAT_PATTERN = re.compile(r"\s*[\(\[](feat\.|with)[^\)\]]*[\)\]]", re.IGNORECASE)
@@ -153,30 +317,62 @@ def _is_alt_version(track_name: str) -> bool:
     return any(kw in lowered for kw in _ALT_VERSION_KEYWORDS)
 
 
+_ARTIST_SPLIT = re.compile(r"\s+(?:feat\.?|ft\.?|featuring|with|x|&|and)\s+|,\s*", re.IGNORECASE)
+
+
+def _primary_artist(artist: str) -> str:
+    """'SZA feat. Travis Scott' -> 'sza' (alphanumerics only)."""
+    first = _ARTIST_SPLIT.split(artist.strip(), maxsplit=1)[0]
+    return re.sub(r"[^a-z0-9]", "", first.lower())
+
+
+def _pick_itunes_result(results: list, track: str, artist: str, require_preview: bool = True) -> dict | None:
+    """Returns the iTunes result that is actually this song, or None.
+
+    Both the title and the main artist must match. There's deliberately no
+    fallback to the top result: iTunes often ranks a *different* song by the
+    same artist first (e.g. "No Idea" for "No Pole" by Don Toliver, which
+    isn't on iTunes at all), and playing the wrong song is worse than
+    playing nothing.
+    """
+    target_title = _normalize_title(track)
+    target_artist = _primary_artist(artist)
+    if not target_title or not target_artist:
+        return None
+    wants_alt = _is_alt_version(track)
+
+    matches = [
+        r for r in results
+        if (r.get("previewUrl") or not require_preview)
+        and _normalize_title(r.get("trackName", "")) == target_title
+        and target_artist in re.sub(r"[^a-z0-9]", "", r.get("artistName", "").lower())
+        and (wants_alt or not _is_alt_version(r.get("trackName", "")))
+    ]
+    return matches[0] if matches else None
+
+
+def _itunes_search(term: str, limit: int) -> list:
+    resp = _session.get(
+        ITUNES_SEARCH_URL,
+        params={"term": term, "entity": "song", "limit": limit},
+        timeout=MB_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+
 def get_preview_url(track: str, artist: str) -> str | None:
+    """Preview clip for exactly this song, or None if iTunes doesn't have it.
+
+    Searches "title artist" first. iTunes ranking sometimes buries the
+    original under covers and karaoke versions (e.g. Redbone), so if that
+    finds nothing, search the main artist's catalogue as well."""
     try:
-        resp = _session.get(
-            ITUNES_SEARCH_URL,
-            params={"term": f"{track} {artist}", "entity": "song", "limit": 10},
-            timeout=MB_TIMEOUT,
-        )
-        resp.raise_for_status()
-        results = resp.json().get("results", [])
-        if not results:
-            return None
-
-        candidates = [r for r in results if not _is_alt_version(r.get("trackName", ""))] or results
-
-        target_title = _normalize_title(track)
-        target_artist = artist.lower()
-        exact = [
-            r for r in candidates
-            if _normalize_title(r.get("trackName", "")) == target_title
-            and target_artist in r.get("artistName", "").lower()
-        ]
-
-        best = exact[0] if exact else candidates[0]
-        return best.get("previewUrl")
+        best = _pick_itunes_result(_itunes_search(f"{track} {artist}", 25), track, artist)
+        if best is None:
+            first_artist = _ARTIST_SPLIT.split(artist.strip(), maxsplit=1)[0]
+            best = _pick_itunes_result(_itunes_search(first_artist, 200), track, artist)
+        return best.get("previewUrl") if best else None
     except Exception:
         logging.exception("iTunes preview lookup failed")
         return None
@@ -347,6 +543,7 @@ def _track_view(t: dict) -> dict:
         "key": t.get("key"),
         "energy": t.get("energy"),
         "genre": t.get("genre"),
+        "preview_url": t.get("preview_url"),
     }
 
 
@@ -394,13 +591,13 @@ and genre flow — e.g. prefer a slightly lower score if the vibe is much better
 Respond with ONLY a JSON object, no other text:
 {{
   "recommended_id": "t?",
-  "bpm_compatibility": "2-3 sentences on the BPM relationship and whether it works",
-  "energy_vibes": "2-3 sentences on energy level, mood, and genre fit",
-  "summary": "1 punchy paragraph — why this is the right next track",
-  "alternatives": [{{"id": "t?", "reason": "one sentence"}}, {{"id": "t?", "reason": "one sentence"}}, {{"id": "t?", "reason": "one sentence"}}],
-  "chain": [{{"id": "t?", "reason": "one sentence on the transition from the recommended track"}}, {{"id": "t?", "reason": "transition from chain track 1"}}, {{"id": "t?", "reason": "transition from chain track 2"}}]
+  "summary": "ONE punchy sentence, max 15 words — why this is the right next track",
+  "alternatives": [{{"id": "t?", "reason": "max 10 words"}}, {{"id": "t?", "reason": "max 10 words"}}, {{"id": "t?", "reason": "max 10 words"}}],
+  "chain": [{{"id": "t?", "reason": "max 10 words on the transition from the recommended track"}}, {{"id": "t?", "reason": "max 10 words"}}, {{"id": "t?", "reason": "max 10 words"}}]
 }}
 
+The page already shows the BPM, key and energy numbers, so don't repeat them —
+talk about vibe, mood, and how the mix will feel. Keep it short: DJs skim.
 Alternatives: 3 other IDs, not the recommended one. Chain: 3 IDs that follow the
 recommended track in order to build a coherent set; don't repeat any ID used above."""
 
@@ -440,6 +637,8 @@ def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dic
         "recommended_artist": rec_track.get("artist"),
         "recommended_bpm": rec_track.get("bpm"),
         "recommended_key": rec_track.get("key"),
+        "recommended_energy": rec_track.get("energy"),
+        "recommended_preview_url": rec_track.get("preview_url"),
         "match_score": round(rec_tr["score"] * 100),
         "bpm_compatibility": raw.get("bpm_compatibility") if not rec_replaced else None,
         "energy_vibes": raw.get("energy_vibes") if not rec_replaced else None,
@@ -460,11 +659,25 @@ def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dic
             f"Top-ranked match from your library: {dj_logic.describe_transition(current, rec_track)}"
         )
 
-    # Alternatives: must come from the shortlist.
+    # Alternatives: must come from the shortlist, and mustn't clash in key
+    # (the model sometimes picks a same-artist track for "continuity" even
+    # though it's a key clash). A clash is only allowed if nothing else is left.
+    def clashes(cid):
+        return by_id[cid][2]["key_score"] == 0.0
+
+    def best_unused_non_clash():
+        return next((c for c in ranked_ids if c not in used and not clashes(c)), None)
+
     for alt in (raw.get("alternatives") or [])[:3]:
-        cid, was_replaced = take(alt.get("id") if isinstance(alt, dict) else None)
+        wanted = alt.get("id") if isinstance(alt, dict) else None
+        if wanted in by_id and wanted not in used and clashes(wanted) and best_unused_non_clash():
+            wanted = None
+        cid, fell_back = take(wanted if wanted is not None else best_unused_non_clash())
         if cid is None:
             break
+        was_replaced = fell_back or cid != (alt.get("id") if isinstance(alt, dict) else None)
+        if was_replaced and not fell_back:   # take() already counted its own fallbacks
+            replaced += 1
         _, t, _ = by_id[cid]
         reason = alt.get("reason") if not was_replaced else None
         result["alternatives"].append({
@@ -472,7 +685,7 @@ def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dic
             "reason": reason or dj_logic.describe_transition(current, t),
         })
     while len(result["alternatives"]) < 3:
-        cid, _ = take(None)
+        cid, _ = take(best_unused_non_clash())
         if cid is None:
             break
         _, t, _ = by_id[cid]
@@ -485,8 +698,8 @@ def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dic
         if cid not in by_id or cid in used:
             break
         _, t, _ = by_id[cid]
-        if dj_logic.transition(prev, t)["key_score"] == 0.0:
-            break  # key clash — stop trusting the model's chain from here
+        if not dj_logic.smooth_step(dj_logic.transition(prev, t)):
+            break  # key clash or too big a tempo jump: stop trusting the model's chain here
         used.add(cid)
         result["chain"].append({**_track_view(t), "reason": step.get("reason") or dj_logic.describe_transition(prev, t)})
         prev = t
@@ -503,18 +716,123 @@ def _assemble_recommendation(current: dict, library: list, by_id: dict, raw: dic
     return result
 
 
+def _deck_view(t: dict) -> dict:
+    """What the mixer needs for one deck. Older library entries may predate
+    stored preview URLs, so look one up on the fly when it's missing. A stored
+    None means "already checked: not on iTunes", so don't search again."""
+    if "preview_url" in t:
+        url = t["preview_url"]
+    else:
+        url = get_preview_url(t.get("title", ""), t.get("artist", ""))
+    return {
+        "title": t.get("title", ""),
+        "artist": t.get("artist", ""),
+        "bpm": t.get("bpm"),
+        "key": t.get("key"),
+        "energy": t.get("energy"),
+        "preview_url": url,
+        # False when BPM/key are only the LLM's estimate (e.g. no iTunes clip to measure)
+        "measured": t.get("source") in ("audio", "published"),
+    }
+
+
+def _grade(score: float) -> str:
+    return "good" if score >= 0.8 else "ok" if score >= 0.4 else "bad"
+
+
+def _quick_stats(current: dict, track: dict) -> dict:
+    """Short, glanceable numbers for the stat tiles (instead of paragraphs)."""
+    tr = dj_logic.transition(current, track)
+    show = lambda v: "?" if v in (None, "") else v
+
+    pct = tr["bpm_pct"]
+    if pct is None:
+        tempo_sub = "unknown"
+    elif tr["bpm_score"] == 1.0:
+        tempo_sub = "easy blend"
+    elif tr["bpm_score"] > 0:
+        tempo_sub = f"{pct:g}% pitch"
+    else:
+        tempo_sub = f"{pct:g}% apart"
+    if "half time" in tr["bpm_label"]:
+        tempo_sub += " · half-time"
+    elif "double time" in tr["bpm_label"]:
+        tempo_sub += " · double-time"
+
+    match = round(tr["score"] * 100)
+    return {
+        "match_value": f"{match}%",
+        "match_sub": "great mix" if match >= 80 else "solid" if match >= 60 else "risky",
+        "match_grade": _grade(tr["score"]),
+        "tempo_value": f"{show(current.get('bpm'))} → {show(track.get('bpm'))}",
+        "tempo_sub": tempo_sub,
+        "tempo_grade": _grade(tr["bpm_score"]),
+        "key_value": f"{show(current.get('key'))} → {show(track.get('key'))}",
+        "key_sub": tr["key_label"],
+        "key_grade": _grade(tr["key_score"]),
+        "energy_value": f"{show(current.get('energy'))} → {show(track.get('energy'))}",
+        "energy_sub": tr["energy_label"],
+        "energy_grade": _grade(tr["energy_score"]),
+    }
+
+
+def _build_options(current: dict, rec: dict, library: list) -> list:
+    """The recommended track plus each alternative, each with everything the
+    page needs to swap it into Deck B: stats, a one-line reason, and a set chain."""
+    picks = [({
+        "title": rec["recommended_track"],
+        "artist": rec["recommended_artist"],
+        "bpm": rec["recommended_bpm"],
+        "key": rec["recommended_key"],
+        "energy": rec["recommended_energy"],
+        "preview_url": rec["recommended_preview_url"],
+    }, rec["summary"], rec["chain"])]
+
+    for alt in rec["alternatives"]:
+        exclude = {
+            i for i, t in enumerate(library)
+            if dj_logic.same_track(t, current) or dj_logic.same_track(t, alt)
+        }
+        chain, prev = [], alt
+        for _, t, _ in dj_logic.build_chain(alt, library, exclude, length=3):
+            chain.append({**_track_view(t), "reason": dj_logic.describe_transition(prev, t)})
+            prev = t
+        picks.append((alt, alt["reason"], chain))
+
+    return [
+        {**_deck_view(t), "reason": reason, "stats": _quick_stats(current, t), "chain": chain}
+        for t, reason, chain in picks
+    ]
+
+
+# Status messages after an add/remove ride along in the session for exactly one
+# page view. (They used to go in the URL, so they stuck around: the Find Next
+# Track form posted back to that same URL and showed the old message again.)
+_MSG_KINDS = ("add_success", "add_warning", "add_error", "add_tips")
+
+
+def _redirect_with(endpoint: str, **messages):
+    session["page_messages"] = {k: v for k, v in messages.items() if k in _MSG_KINDS and v}
+    return redirect(url_for(endpoint))
+
+
+def _pop_messages() -> dict:
+    msgs = session.pop("page_messages", None) or {}
+    return {k: msgs.get(k) for k in _MSG_KINDS}
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     visitor_id = get_visitor_id()
     rec = None
     search_error = None
+    search_tips = False
     suggestions = []
     track = ""
     artist = ""
 
-    add_success = request.args.get("add_success")
-    add_error = request.args.get("add_error")
-    add_warning = request.args.get("add_warning")
+    msgs = _pop_messages()
+    add_success, add_error, add_warning = msgs["add_success"], msgs["add_error"], msgs["add_warning"]
     add_suggestions = session.pop("add_suggestions", [])
     library = list(reversed(load_library(visitor_id)))
 
@@ -530,7 +848,8 @@ def index():
             try:
                 mb_info, suggestions = search_musicbrainz(track, artist)
                 if not mb_info:
-                    search_error = f'We couldn\'t find "{track}" by {artist}. Please check the spelling or try one of the suggestions below.'
+                    search_error = not_found_message(track, artist, suggestions)
+                    search_tips = not suggestions
                 else:
                     mb_artist = mb_info.get("artist") or artist
                     mb_title = mb_info.get("title") or track
@@ -539,10 +858,16 @@ def index():
                     # otherwise measure it so the shortlist has real numbers.
                     current = find_in_library(mb_title, mb_artist, lib) or find_in_library(track, mb_artist, lib)
                     if current is None:
-                        preview = get_preview_url(track, mb_artist)
+                        preview = get_preview_url(mb_title, mb_artist)
                         meta = build_track_metadata(track, mb_artist, mb_info, preview)
-                        current = {"title": mb_title, "artist": mb_artist, **meta}
+                        current = {"title": mb_title, "artist": mb_artist, **meta, "preview_url": preview}
                     rec = recommend_next_track(current, mb_info, lib)
+                    rec["deck_a"] = _deck_view(current)
+                    rec["options"] = _build_options(current, rec, lib)
+                    rec["deck_b"] = rec["options"][0]
+            except SearchUnavailable:
+                logging.exception("Song lookup services unavailable")
+                search_error = SEARCH_UNAVAILABLE_MSG
             except Exception as e:
                 logging.exception("Search error")
                 search_error = "Something went wrong. Please try again."
@@ -553,10 +878,13 @@ def index():
         artist=artist,
         rec=rec,
         search_error=search_error,
+        search_tips=search_tips,
+        tips=SEARCH_TIPS,
         suggestions=suggestions,
         add_success=add_success,
         add_error=add_error,
         add_warning=add_warning,
+        add_tips=msgs["add_tips"],
         add_suggestions=add_suggestions,
         library=library,
         active_page="home",
@@ -570,16 +898,17 @@ def add_track():
     artist = request.form.get("artist", "").strip()
 
     if not track or not artist:
-        return redirect(url_for("index", add_error="Please enter both a track name and artist."))
+        return _redirect_with("index", add_error="Please enter both a track name and artist.")
 
     if len(track) > 200 or len(artist) > 200:
-        return redirect(url_for("index", add_error="Track and artist names must be under 200 characters."))
+        return _redirect_with("index", add_error="Track and artist names must be under 200 characters.")
 
     try:
         mb_info, add_suggestions = search_musicbrainz(track, artist)
         if not mb_info:
             session["add_suggestions"] = add_suggestions
-            return redirect(url_for("index", add_error=f'Couldn\'t find "{track}" by {artist}. Did you mean one of these?'))
+            return _redirect_with("index", add_error=not_found_message(track, artist, add_suggestions),
+                                  add_tips=not add_suggestions)
 
         mb_artist = mb_info.get("artist") or artist
 
@@ -589,9 +918,9 @@ def add_track():
             stored_title = t["title"].lower()
             stored_artist = t["artist"].lower()
             if stored_artist == mb_artist.lower() and (stored_title == track.lower() or stored_title == mb_title):
-                return redirect(url_for("index", add_warning=f'"{t["title"]}" by {t["artist"]} is already in your library.'))
+                return _redirect_with("index", add_warning=f'"{t["title"]}" by {t["artist"]} is already in your library.')
 
-        preview_url = get_preview_url(track, mb_artist)
+        preview_url = get_preview_url(mb_info.get("title", track), mb_artist)
         metadata = build_track_metadata(track, mb_artist, mb_info, preview_url)
         confidence = metadata["confidence"]
 
@@ -607,16 +936,19 @@ def add_track():
         if confidence in ("low", "medium"):
             note = metadata.get("confidence_note", "")
             suffix = f" — {note}" if note else ""
-            return redirect(url_for(
+            return _redirect_with(
                 "index",
                 add_success=add_success,
                 add_warning=f"BPM/key/energy confidence for this track is {confidence}{suffix}. Worth double-checking manually.",
-            ))
-        return redirect(url_for("index", add_success=add_success))
+            )
+        return _redirect_with("index", add_success=add_success)
 
+    except SearchUnavailable:
+        logging.exception("Song lookup services unavailable")
+        return _redirect_with("index", add_error=SEARCH_UNAVAILABLE_MSG)
     except Exception:
         logging.exception("Add track error")
-        return redirect(url_for("index", add_error="Something went wrong adding that track. Please try again."))
+        return _redirect_with("index", add_error="Something went wrong adding that track. Please try again.")
 
 
 @app.route("/remove", methods=["POST"])
@@ -631,18 +963,18 @@ def remove_track():
     filtered = [t for t in library if not (t["title"] == title and t["artist"] == artist)]
 
     if len(filtered) == len(library):
-        return redirect(url_for(target, add_error=f'Couldn\'t find "{title}" by {artist} to remove.'))
+        return _redirect_with(target, add_error=f'Couldn\'t find "{title}" by {artist} to remove.')
 
     save_library(visitor_id, filtered)
-    return redirect(url_for(target, add_success=f'Removed "{title}" by {artist} from your library.'))
+    return _redirect_with(target, add_success=f'Removed "{title}" by {artist} from your library.')
 
 
 @app.route("/library")
 def library_page():
     visitor_id = get_visitor_id()
     library = list(reversed(load_library(visitor_id)))
-    add_success = request.args.get("add_success")
-    add_error = request.args.get("add_error")
+    msgs = _pop_messages()
+    add_success, add_error = msgs["add_success"], msgs["add_error"]
     return render_template(
         "library.html",
         library=library,

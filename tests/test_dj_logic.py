@@ -62,7 +62,22 @@ def test_shortlist_ranks_and_excludes_current(library):
     assert "Same Key" not in titles
     assert titles[0] in {"Adjacent", "Relative", "Half Time"}
     assert titles.index("Clash Key") > titles.index("Adjacent")
-    assert titles.index("Too Fast") > titles.index("Adjacent")
+    # 125 vs 98 BPM is too far apart to sync, and there are enough closer picks.
+    assert "Too Fast" not in titles
+
+
+def test_shortlist_falls_back_to_unsyncable_when_needed():
+    current = track("Now", 98, "8A", 6)
+    lib = [
+        track("Close", 100, "9A", 6),
+        track("Close 2", 97, "8B", 6),
+        track("Far", 125, "8A", 6),
+        track("Far 2", 140, "8A", 6),
+    ]
+    titles = [t["title"] for _, t, _ in dj_logic.shortlist(current, lib)]
+    # Not enough syncable tracks for a full set of picks: far ones go last.
+    assert set(titles[:2]) == {"Close", "Close 2"}
+    assert set(titles[2:]) == {"Far", "Far 2"}
 
 
 def test_build_chain_never_adds_a_clash():

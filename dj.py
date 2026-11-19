@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2"
-MB_HEADERS = {"User-Agent": "dj-assistant/1.0 (nuriashafqat711@gmail.com)"}
+MB_CONTACT = os.getenv("MB_CONTACT") or "https://github.com/nuriahannahshafqat/dj-assistant"
+MB_HEADERS = {"User-Agent": f"dj-assistant/1.0 ( {MB_CONTACT} )"}
 
 
 def search_musicbrainz(track: str, artist: str) -> dict:

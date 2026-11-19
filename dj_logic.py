@@ -18,6 +18,11 @@ WEIGHTS = {"key": 0.45, "bpm": 0.40, "energy": 0.15}
 BPM_IDEAL = 0.03
 BPM_MAX = 0.08
 
+# Furthest the in-browser mixer will stretch a track to sync it (keep in step
+# with MAX_PITCH in templates/index.html). Picks beyond this can't be
+# beat-matched at all, so they're only offered when nothing closer exists.
+SYNC_MAX = 0.16
+
 
 def parse_camelot(key):
     """'8A' -> (8, 'A'). Returns None for anything that isn't a Camelot key."""
@@ -130,10 +135,8 @@ def describe_transition(current, candidate):
     """Plain-English one-liner built from real numbers, used when the LLM is
     unavailable or its answer had to be replaced."""
     t = transition(current, candidate)
-    return (
-        f"{current.get('key', '?')} → {candidate.get('key', '?')} ({t['key_label']}), "
-        f"{current.get('bpm', '?')} → {candidate.get('bpm', '?')} BPM ({t['bpm_label']})."
-    )
+    text = f"{t['key_label']}, {t['bpm_label']}."
+    return text[0].upper() + text[1:]
 
 
 def same_track(a, b):
@@ -143,11 +146,28 @@ def same_track(a, b):
     )
 
 
+def can_sync(t):
+    """True unless the tempos are known to be too far apart to beat-match."""
+    return t["bpm_pct"] is None or t["bpm_pct"] <= SYNC_MAX * 100
+
+
+def smooth_step(t):
+    """A set-chain step a DJ would actually play: no key clash, and the tempo
+    within comfortable pitch range (BPM_MAX) rather than merely syncable."""
+    return t["key_score"] > 0.0 and (t["bpm_pct"] is None or t["bpm_pct"] < BPM_MAX * 100)
+
+
+# A recommendation plus 3 alternatives.
+MIN_PICKS = 4
+
+
 def shortlist(current, library, limit=15):
     """Ranks library tracks by how well they follow `current`.
 
     Returns a list of (index_in_library, track, transition_dict), best first.
-    The current track itself is excluded.
+    The current track itself is excluded. Tracks whose tempo can't be synced
+    are left out, unless there aren't enough syncable ones for a full set of
+    picks, in which case they're added at the end.
     """
     ranked = []
     for i, track in enumerate(library):
@@ -155,7 +175,10 @@ def shortlist(current, library, limit=15):
             continue
         ranked.append((i, track, transition(current, track)))
     ranked.sort(key=lambda r: r[2]["score"], reverse=True)
-    return ranked[:limit]
+    syncable = [r for r in ranked if can_sync(r[2])]
+    if len(syncable) >= MIN_PICKS:
+        return syncable[:limit]
+    return (syncable + [r for r in ranked if not can_sync(r[2])])[:limit]
 
 
 MIN_CHAIN_SCORE = 0.45
@@ -174,7 +197,7 @@ def build_chain(start, library, exclude_indices, length=3, min_score=MIN_CHAIN_S
             if i in used or same_track(prev, track) or same_track(start, track):
                 continue
             t = transition(prev, track)
-            if t["key_score"] == 0.0 or t["score"] < min_score:
+            if not smooth_step(t) or t["score"] < min_score:
                 continue
             if best is None or t["score"] > best[2]["score"]:
                 best = (i, track, t)

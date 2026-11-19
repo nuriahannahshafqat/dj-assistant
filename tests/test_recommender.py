@@ -125,3 +125,31 @@ def test_musicbrainz_prefers_original_over_instrumental():
     # ...unless the user actually typed "instrumental"
     assert dj_app._pick_recording(results, "Shut It Down instrumental")["id"] == "inst"
     assert dj_app._pick_recording([{"id": "x", "title": "A", "score": 50}], "A") is None
+
+
+def _id_of(current, library, title):
+    ranked = dj_logic.shortlist(current, library, limit=dj_app.SHORTLIST_SIZE)
+    return next(f"t{n + 1}" for n, (_, t, _) in enumerate(ranked) if t["title"] == title)
+
+
+def test_key_clash_alternative_is_swapped_for_a_compatible_one(monkeypatch, current, library):
+    clash_id = _id_of(current, library, "Clash Key")
+    rec_id = _id_of(current, library, "Adjacent")
+    def fake_claude(prompt, max_tokens=512):
+        return json.dumps({
+            "recommended_id": rec_id, "summary": "s",
+            "alternatives": [{"id": clash_id, "reason": "same artist continuity"}],
+            "chain": [],
+        })
+    monkeypatch.setattr(dj_app, "call_claude", fake_claude)
+    rec = dj_app.recommend_next_track(current, {}, library)
+    alt_titles = [a["title"] for a in rec["alternatives"]]
+    assert "Clash Key" not in alt_titles
+    assert "same artist continuity" not in [a["reason"] for a in rec["alternatives"]]
+
+
+def test_chain_never_jumps_more_than_comfortable_pitch_range():
+    start = track("Start", 100, "8A", 6)
+    lib = [start, track("Big Jump", 115, "8A", 6), track("Close", 103, "9A", 6)]
+    chain = dj_logic.build_chain(start, lib, exclude_indices={0}, length=3)
+    assert [t["title"] for _, t, _ in chain] == ["Close"]
